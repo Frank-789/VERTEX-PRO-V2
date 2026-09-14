@@ -1,0 +1,47 @@
+# ---- 环境变量与密钥（绝不入库）----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- 用户数据与运行时状态 ----
+data/*
+!data/.gitkeep
+data/user/
+prompts/user/
+*.log
+logs/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+build/
+dist/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ---- 数据库 ----
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- 编辑器 / 系统 ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
