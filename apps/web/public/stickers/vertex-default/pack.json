@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "id": "vertex-default",
+  "name": "Vertex · 经营助手",
+  "version": "1.0.0",
+  "stickers": [
+    {
+      "file": "wave.svg",
+      "description": "Greeting / saying hello / 打招呼",
+      "label": "打招呼"
+    },
+    {
+      "file": "goodbye.svg",
+      "description": "Saying goodbye / 收工告辞",
+      "label": "收工告辞"
+    },
+    {
+      "file": "thanks.svg",
+      "description": "Thanks / appreciation / 谢谢",
+      "label": "谢谢"
+    },
+    {
+      "file": "sorry.svg",
+      "description": "Apology / feeling sorry / 抱歉",
+      "label": "抱歉"
+    },
+    {
+      "file": "thinking.svg",
+      "description": "Thinking / considering / 思考中",
+      "label": "思考中"
+    },
+    {
+      "file": "searching.svg",
+      "description": "Searching products / 找货中",
+      "label": "找货中"
+    },
+    {
+      "file": "calculating.svg",
+      "description": "Calculating numbers / 算账中",
+      "label": "算账中"
+    },
+    {
+      "file": "generating.svg",
+      "description": "Generating images / 出图中",
+      "label": "出图中"
+    },
+    {
+      "file": "success.svg",
+      "description": "Done / success / 搞定了",
+      "label": "搞定了"
+    },
+    {
+      "file": "celebrate.svg",
+      "description": "Celebration / big win / 爆单了",
+      "label": "爆单了"
+    },
+    {
+      "file": "warning.svg",
+      "description": "Warning / risk / 有风险",
+      "label": "有风险"
+    },
+    {
+      "file": "nope.svg",
+      "description": "Refusal / saying no / 不行",
+      "label": "不行"
+    },
+    {
+      "file": "wait.svg",
+      "description": "Wait a moment / 稍等",
+      "label": "稍等"
+    },
+    {
+      "file": "confused.svg",
+      "description": "Confused / 迷惑了",
+      "label": "迷惑了"
+    },
+    {
+      "file": "confident.svg",
+      "description": "Confident / locked in / 稳了",
+      "label": "稳了"
+    },
+    {
+      "file": "exhausted.svg",
+      "description": "Exhausted / 累瘫了",
+      "label": "累瘫了"
+    },
+    {
+      "file": "coffee.svg",
+      "description": "Taking a break / 喝口水",
+      "label": "喝口水"
+    },
+    {
+      "file": "shocked.svg",
+      "description": "Surprise / shock / 惊了",
+      "label": "惊了"
+    },
+    {
+      "file": "skeptical.svg",
+      "description": "Skeptical / 存疑",
+      "label": "存疑"
+    },
+    {
+      "file": "laugh.svg",
+      "description": "Laughter / amusement / 笑死",
+      "label": "笑死"
+    }
+  ]
+}

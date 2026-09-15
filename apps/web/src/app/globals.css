@@ -1,0 +1,596 @@
+@import 'tailwindcss';
+
+/* ===========================================================================
+   设计语言：暖色编辑台 (Warm Editorial Workstation)
+
+   【色板架构】学自 OpenAlice 的公开设计文档（ui/src/theme/palette.css）：
+   颜色全部走「语义命名 + 可切换色板」两层。
+
+     · 第一层 —— 语义色板：:root[data-palette="..."] 定义 --background /
+       --foreground / --card / --primary / --border ... 组件只认这些名字。
+     · 第二层 —— Tailwind 映射：下面 @theme inline 把语义名转成工具类。
+       inline 是必须的，否则 Tailwind 会在构建期把值烤死，切色板就不生效了。
+
+   色板命名沿用 shadcn / Orca 这套业界通用约定，不另起炉灶 ——
+   将来接入任何基于 shadcn 的组件库都能直接用。
+
+   【取值】色板取值是在同一色系内自行推导的，不是照抄对方的十六进制值。
+   设计语言（暖白纸面 + 克制的蓝 + 细分隔线 + 无渐变）是「思路」，可以学；
+   具体色值属对方代码，我们保持 MIT，不搬。
+
+   【文本层级】对方是仪表盘，正文很少，所以只有 foreground / muted-foreground
+   两级。我们要渲染长回答，多加了 soft / faint / ghost 三级 —— 作为超集。
+   =========================================================================== */
+
+/* ------------------------------------------------------------ 色板：paper */
+/* 暖白纸面。默认色板。 */
+
+:root,
+:root[data-palette='paper'] {
+  color-scheme: light;
+
+  --background: #faf8f4;
+  --foreground: #2b2722;
+  --card: #fffefb;
+  --card-foreground: #2b2722;
+  --secondary: #f3f0ea;
+  --secondary-foreground: #2b2722;
+  --muted: #ece7dd;
+  --muted-foreground: #5f5850;
+
+  --primary: #2f6fb5;
+  --primary-foreground: #ffffff;
+  --primary-muted: rgba(47, 111, 181, 0.12);
+
+  --success: #2f7d54;
+  --success-foreground: #ffffff;
+  --success-muted: rgba(47, 125, 84, 0.1);
+
+  --destructive: #b8442f;
+  --destructive-foreground: #ffffff;
+  --destructive-muted: rgba(184, 68, 47, 0.1);
+
+  --warning: #a8761c;
+  --warning-foreground: #ffffff;
+  --warning-muted: rgba(168, 118, 28, 0.12);
+
+  --border: #e6e1d7;
+  --input: #d5cec1;
+  --ring: #2f6fb5;
+
+  /* 文本层级超集 */
+  --foreground-soft: #5f5850;
+  --foreground-faint: #918a7f;
+  --foreground-ghost: #b3aca1;
+
+}
+
+/* ------------------------------------------------------------ 色板：linen */
+/* 纸面偏冷一点，适合长时间盯屏幕。 */
+
+:root[data-palette='linen'] {
+  color-scheme: light;
+
+  --background: #f7f8f6;
+  --foreground: #24282a;
+  --card: #ffffff;
+  --card-foreground: #24282a;
+  --secondary: #eff1ee;
+  --secondary-foreground: #24282a;
+  --muted: #e6e9e4;
+  --muted-foreground: #59605e;
+
+  --primary: #2c6a72;
+  --primary-foreground: #ffffff;
+  --primary-muted: rgba(44, 106, 114, 0.12);
+
+  --success: #2c7a5b;
+  --success-foreground: #ffffff;
+  --success-muted: rgba(44, 122, 91, 0.1);
+
+  --destructive: #b0453a;
+  --destructive-foreground: #ffffff;
+  --destructive-muted: rgba(176, 69, 58, 0.1);
+
+  --warning: #9c7220;
+  --warning-foreground: #ffffff;
+  --warning-muted: rgba(156, 114, 32, 0.12);
+
+  --border: #e0e3de;
+  --input: #ccd1cb;
+  --ring: #2c6a72;
+
+  --foreground-soft: #59605e;
+  --foreground-faint: #8a918e;
+  --foreground-ghost: #adb3af;
+
+}
+
+/* --------------------------------------------------------- 色板：graphite */
+/* 深色。接近开发者工具那种低饱和中性灰。 */
+
+:root[data-palette='graphite'] {
+  color-scheme: dark;
+
+  --background: #1b1917;
+  --foreground: #ece7df;
+  --card: #232019;
+  --card-foreground: #ece7df;
+  --secondary: #1f1c18;
+  --secondary-foreground: #ece7df;
+  --muted: #2a2620;
+  --muted-foreground: #b0a99e;
+
+  --primary: #6ea6dc;
+  --primary-foreground: #12181f;
+  --primary-muted: rgba(110, 166, 220, 0.18);
+
+  --success: #5cae82;
+  --success-foreground: #0d1a13;
+  --success-muted: rgba(92, 174, 130, 0.16);
+
+  --destructive: #d9705a;
+  --destructive-foreground: #1c0f0c;
+  --destructive-muted: rgba(217, 112, 90, 0.16);
+
+  --warning: #d4a54c;
+  --warning-foreground: #1c1608;
+  --warning-muted: rgba(212, 165, 76, 0.16);
+
+  --border: #38332b;
+  --input: #4a4439;
+  --ring: #6ea6dc;
+
+  --foreground-soft: #b0a99e;
+  --foreground-faint: #857e74;
+  --foreground-ghost: #605a52;
+
+}
+
+/* --------------------------------------------------------- 色板：midnight */
+/* 深色，偏蓝。 */
+
+:root[data-palette='midnight'] {
+  color-scheme: dark;
+
+  --background: #14171c;
+  --foreground: #e6eaf0;
+  --card: #1b1f26;
+  --card-foreground: #e6eaf0;
+  --secondary: #181c22;
+  --secondary-foreground: #e6eaf0;
+  --muted: #232830;
+  --muted-foreground: #a4adba;
+
+  --primary: #6f9fe8;
+  --primary-foreground: #0d1420;
+  --primary-muted: rgba(111, 159, 232, 0.18);
+
+  --success: #4fae86;
+  --success-foreground: #0a1712;
+  --success-muted: rgba(79, 174, 134, 0.16);
+
+  --destructive: #e06a5e;
+  --destructive-foreground: #1d0e0c;
+  --destructive-muted: rgba(224, 106, 94, 0.16);
+
+  --warning: #d9a94e;
+  --warning-foreground: #1b1508;
+  --warning-muted: rgba(217, 169, 78, 0.16);
+
+  --border: #2b313a;
+  --input: #3b424d;
+  --ring: #6f9fe8;
+
+  --foreground-soft: #a4adba;
+  --foreground-faint: #79828f;
+  --foreground-ghost: #545c67;
+
+}
+
+/* 没显式选色板时跟随系统。显式选过就听用户的。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-palette]) {
+    color-scheme: dark;
+
+    --background: #1b1917;
+    --foreground: #ece7df;
+    --card: #232019;
+    --card-foreground: #ece7df;
+    --secondary: #1f1c18;
+    --secondary-foreground: #ece7df;
+    --muted: #2a2620;
+    --muted-foreground: #b0a99e;
+
+    --primary: #6ea6dc;
+    --primary-foreground: #12181f;
+    --primary-muted: rgba(110, 166, 220, 0.18);
+
+    --success: #5cae82;
+    --success-foreground: #0d1a13;
+    --success-muted: rgba(92, 174, 130, 0.16);
+
+    --destructive: #d9705a;
+    --destructive-foreground: #1c0f0c;
+    --destructive-muted: rgba(217, 112, 90, 0.16);
+
+    --warning: #d4a54c;
+    --warning-foreground: #1c1608;
+    --warning-muted: rgba(212, 165, 76, 0.16);
+
+    --border: #38332b;
+    --input: #4a4439;
+    --ring: #6ea6dc;
+
+    --foreground-soft: #b0a99e;
+    --foreground-faint: #857e74;
+    --foreground-ghost: #605a52;
+
+  }
+}
+
+/* ================================================== 语义名 → Tailwind 工具类 */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-muted: var(--primary-muted);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-muted: var(--destructive-muted);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-foreground-soft: var(--foreground-soft);
+  --color-foreground-faint: var(--foreground-faint);
+  --color-foreground-ghost: var(--foreground-ghost);
+
+  /* ---- 圆角：克制。尺度对齐对方的公开规格（5/8/10/12/16/20）---- */
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+
+  /* ---- 字体 ---- */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  /* ---- 动效令牌。曲线与档位对齐对方的公开规格 ---- */
+  --motion-fast: 110ms;
+  --motion-standard: 160ms;
+  --motion-slow: 250ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---------------------------------------------------------------- 基础 */
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 数量、价格、百分比、时间戳 */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* 标识符、编号、命令、机器输出 */
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--primary-muted);
+}
+
+/* 滚动条：细、暖、不抢戏 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--input) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--input);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------- 动效 */
+
+/* 消息入场：轻微上移 + 淡入 */
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 流式输出光标 */
+@keyframes caret-pulse {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+/* 思考指示：三点依次呼吸 */
+@keyframes dots-breathe {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* 展开 / 收起 */
+@keyframes disclose-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 表情包入场：轻微弹入 */
+@keyframes sticker-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.anim-msg-in {
+  animation: msg-in var(--motion-standard) var(--motion-ease-out) both;
+}
+.anim-disclose {
+  animation: disclose-down var(--motion-fast) var(--motion-ease-out) both;
+}
+.anim-sticker {
+  animation: sticker-pop var(--motion-slow) var(--motion-ease-out) both;
+}
+
+.caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--foreground-faint);
+  animation: caret-pulse 1.05s steps(1, end) infinite;
+}
+
+.dot {
+  animation: dots-breathe 1.25s var(--motion-ease-standard) infinite;
+}
+.dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+/* 尊重系统设置：关闭动效时全部降级为静态 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* 焦点：可见但不刺眼。
+   必须放进 @layer base —— 未分层的规则会盖过 Tailwind 的 utilities，
+   导致组件里写的 focus-visible:outline-none 失效。 */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 5px;
+  }
+}
+
+/* ---------------------------------------------------------------- 正文排版 */
+
+/* 层级靠字号、间距、细分隔线建立，不靠容器嵌套 */
+.md > *:first-child {
+  margin-top: 0;
+}
+.md > *:last-child {
+  margin-bottom: 0;
+}
+
+.md p {
+  margin: 0.55em 0;
+  font-size: 14.5px;
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 1.3em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--foreground);
+}
+.md h1 {
+  font-size: 19px;
+}
+.md h2 {
+  font-size: 17px;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}
+.md h3 {
+  font-size: 15.5px;
+}
+.md h4 {
+  font-size: 14.5px;
+}
+
+.md ul,
+.md ol {
+  margin: 0.55em 0;
+  padding-left: 1.35em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.22em 0;
+  font-size: 14.5px;
+}
+.md li::marker {
+  color: var(--foreground-ghost);
+}
+
+.md strong {
+  font-weight: 600;
+}
+
+.md a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+}
+
+.md pre {
+  margin: 0.7em 0;
+  padding: 11px 13px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+}
+.md pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+/* 表格：数据表在对话里很常见，给等宽数字对齐 */
+.md table {
+  margin: 0.75em 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+.md th,
+.md td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.md th {
+  background: var(--secondary);
+  font-weight: 600;
+}
+
+.md blockquote {
+  margin: 0.7em 0;
+  padding: 0.1em 0 0.1em 0.9em;
+  border-left: 2px solid var(--input);
+  color: var(--foreground-soft);
+}
+
+.md hr {
+  margin: 1.2em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.md img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}

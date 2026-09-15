@@ -1,0 +1,56 @@
+{
+  "$comment": "AI 供应商路由。按序尝试，前一个失败自动降级到下一个。密钥一律从环境变量读，不写在这里。",
+  "chat": [
+    {
+      "id": "deepseek",
+      "provider": "openai-compat",
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-chat",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "timeout": 60
+    },
+    {
+      "id": "kimi",
+      "provider": "openai-compat",
+      "base_url": "https://api.moonshot.cn",
+      "model": "moonshot-v1-8k",
+      "api_key_env": "KIMI_API_KEY",
+      "timeout": 60
+    },
+    {
+      "$comment": "开发用假供应商，排在最后 —— 配了真 key 就轮不到它。见 apps/api/dev/mock_provider.py",
+      "id": "mock",
+      "provider": "openai-compat",
+      "base_url": "http://127.0.0.1:8899",
+      "model": "mock",
+      "api_key_env": "MOCK_API_KEY",
+      "timeout": 30
+    }
+  ],
+  "planning": [
+    {
+      "id": "deepseek",
+      "provider": "openai-compat",
+      "base_url": "https://api.deepseek.com",
+      "model": "deepseek-chat",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "timeout": 90
+    },
+    {
+      "id": "kimi",
+      "provider": "openai-compat",
+      "base_url": "https://api.moonshot.cn",
+      "model": "moonshot-v1-8k",
+      "api_key_env": "KIMI_API_KEY",
+      "timeout": 90
+    },
+    {
+      "id": "mock",
+      "provider": "openai-compat",
+      "base_url": "http://127.0.0.1:8899",
+      "model": "mock",
+      "api_key_env": "MOCK_API_KEY",
+      "timeout": 30
+    }
+  ]
+}
