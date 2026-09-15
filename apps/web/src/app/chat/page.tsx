@@ -62,9 +62,10 @@ function ChatSurface() {
       {error && (
         <div
           role="alert"
-          className="mx-auto mb-1 w-full max-w-3xl px-4 text-[12.5px] text-[var(--destructive)]"
+          className="mx-[max(24px,calc((100%-736px)/2))] mb-1 grid gap-1 rounded-[10px] border border-[color-mix(in_srgb,var(--destructive)_50%,var(--border))] p-3 text-[12px] text-[var(--destructive)]"
         >
-          {error}
+          <strong className="font-semibold">没能继续</strong>
+          <span>{error}</span>
         </div>
       )}
 

@@ -11,11 +11,30 @@ import { ArrowUp, Square } from 'lucide-react'
  *   Shift+Enter  换行
  *   Esc          停止生成
  *
- * 高度随内容自增，上限 200px 后内部滚动 —— 长问题不被裁掉，
+ * 版式学自 OpenAlice 的公开设计文档：
+ *   · 外壳 26px 大圆角，**不描边**，用一圈极淡的阴影当边界 —— 描边会让它
+ *     看起来像个表单，阴影才像个「可以往里放东西的托盘」
+ *   · 聚焦反馈由外壳承担（focus-within 加深阴影），textarea 自身去掉 outline
+ *   · 发送键是 32px 圆形，实心前景色 —— 和外壳的浅色形成足够对比
+ *
+ * 高度随内容自增，上限 168px 后内部滚动 —— 长问题不被裁掉，
  * 又不会把对话挤没。
  */
 
-const MAX_HEIGHT = 200
+const MIN_HEIGHT = 68
+const MAX_HEIGHT = 168
+
+const SHELL_SHADOW =
+  '0 0 0 1px color-mix(in srgb, var(--foreground) 4%, transparent), ' +
+  '0 2px 8px color-mix(in srgb, var(--foreground) 4%, transparent), ' +
+  '0 14px 52px color-mix(in srgb, var(--foreground) 8%, transparent), ' +
+  'inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)'
+
+const SHELL_SHADOW_FOCUS =
+  '0 0 0 1px color-mix(in srgb, var(--foreground) 5%, transparent), ' +
+  '0 2px 8px color-mix(in srgb, var(--foreground) 5%, transparent), ' +
+  '0 14px 52px color-mix(in srgb, var(--foreground) 10%, transparent), ' +
+  'inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent)'
 
 export function Composer({
   onSend,
@@ -35,12 +54,11 @@ export function Composer({
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
 
-  // 高度自适应
   useEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, MIN_HEIGHT), MAX_HEIGHT)}px`
   }, [value])
 
   useEffect(() => {
@@ -55,6 +73,8 @@ export function Composer({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // isComposing 是中文输入法的命门：不加这个判断，
+    // 拼音选词时按 Enter 会把半成品直接发出去
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       submit()
@@ -69,26 +89,40 @@ export function Composer({
   const canSend = value.trim().length > 0 && !streaming && !disabled
 
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--background)] px-4 pt-3 pb-4">
-      <div className="mx-auto max-w-3xl">
-        <div className="flex items-end gap-2 rounded-[var(--radius-lg)] border border-[var(--input)] bg-[var(--card)] px-3 py-2 transition-colors focus-within:border-[var(--primary)]">
-          <textarea
-            ref={ref}
-            rows={1}
-            value={value}
-            disabled={disabled}
-            placeholder={placeholder}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="min-h-[26px] flex-1 resize-none bg-transparent py-1 text-[14.5px] leading-relaxed text-[var(--foreground)] outline-none focus-visible:outline-none placeholder:text-[var(--foreground-ghost)] disabled:opacity-50"
-            aria-label="输入消息"
-          />
+    <div className="shrink-0 px-[max(24px,calc((100%-736px)/2))] pt-3 pb-5">
+      <div
+        className="rounded-[26px] bg-[color-mix(in_srgb,var(--card)_94%,transparent)] px-3 pt-3 pb-2.5 transition-shadow duration-[var(--motion-fast)] focus-within:shadow-[var(--shell-shadow-focus)]"
+        style={
+          {
+            boxShadow: SHELL_SHADOW,
+            '--shell-shadow-focus': SHELL_SHADOW_FOCUS,
+          } as React.CSSProperties
+        }
+      >
+        <textarea
+          ref={ref}
+          rows={1}
+          value={value}
+          disabled={disabled}
+          placeholder={placeholder}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="block w-full resize-none border-0 bg-transparent p-1.5 text-[14px] leading-[21px] text-[var(--foreground)] focus-visible:outline-none placeholder:text-[var(--foreground-ghost)] disabled:opacity-50"
+          style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT }}
+          aria-label="输入消息"
+        />
+
+        <div className="flex min-h-8 items-end justify-between gap-2 px-0.5 pt-1">
+          <span className="text-[11px] text-[var(--foreground-ghost)]">
+            Enter 发送 · Shift+Enter 换行
+            {streaming && ' · Esc 停止'}
+          </span>
 
           {streaming ? (
             <button
               type="button"
               onClick={onStop}
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--input)] text-[var(--foreground-soft)] transition-colors hover:border-[var(--destructive)] hover:text-[var(--destructive)]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] transition-opacity hover:opacity-80"
               aria-label="停止生成"
             >
               <Square size={13} fill="currentColor" />
@@ -98,18 +132,14 @@ export function Composer({
               type="button"
               onClick={submit}
               disabled={!canSend}
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--primary)] text-white transition-opacity disabled:opacity-25"
+              aria-busy={streaming}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] text-[var(--background)] transition-opacity hover:opacity-90 disabled:bg-[var(--muted)] disabled:text-[var(--muted-foreground)] disabled:opacity-55"
               aria-label="发送"
             >
-              <ArrowUp size={15} strokeWidth={2.5} />
+              <ArrowUp size={17} strokeWidth={2.25} />
             </button>
           )}
         </div>
-
-        <p className="mt-1.5 px-1 text-[11px] text-[var(--foreground-ghost)]">
-          Enter 发送 · Shift+Enter 换行
-          {streaming && ' · Esc 停止'}
-        </p>
       </div>
     </div>
   )

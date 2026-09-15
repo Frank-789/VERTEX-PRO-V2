@@ -1,26 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, ChevronRight, Loader2, X } from 'lucide-react'
+import { Check, ChevronRight, CircleAlert, LoaderCircle } from 'lucide-react'
 import { DATA_SOURCE_LABEL, type ToolCall } from '@/lib/types'
 
 /**
- * 工具调用卡片。
+ * 工具调用。
  *
- * 折叠时只给一行：状态图标 + 工具名 + 摘要（命中条数 / 耗时）。
- * 点开才展示细节。默认折叠 —— 采集过程不该盖过结论本身。
+ * 版式学自 OpenAlice 的公开设计文档：**用内嵌导轨，不用嵌套卡片**。
+ *
+ * 卡片会引出「容器套容器」的观感 —— 对话里本来就有气泡、有表格、有代码块，
+ * 再套一层边框就吵了。左边一条细导轨足以表达「这些是过程」，而且和正文的
+ * 左缩进对齐得很好。
+ *
+ * 折叠时只给一行：状态图标 + 工具名 + 摘要。默认折叠 —— 采集过程不该盖过结论。
+ *
+ * 成功态刻意**不用绿色**：绿在这个产品里表示「盈利 / 安全」，
+ * 拿它表示「工具跑通了」会把财务语义稀释掉。中性勾就够。
  */
 
 const STATUS_ICON = {
-  running: Loader2,
+  running: LoaderCircle,
   ok: Check,
-  failed: X,
-} as const
-
-const STATUS_CLASS = {
-  running: 'text-[var(--primary)]',
-  ok: 'text-[var(--success)]',
-  failed: 'text-[var(--destructive)]',
+  failed: CircleAlert,
 } as const
 
 function summarise(call: ToolCall): string {
@@ -29,7 +31,9 @@ function summarise(call: ToolCall): string {
   if (typeof call.count === 'number') bits.push(`${call.count} 条`)
   if (call.error) bits.push(call.error)
   if (typeof call.durationMs === 'number') {
-    bits.push(call.durationMs >= 1000 ? `${(call.durationMs / 1000).toFixed(1)}s` : `${call.durationMs}ms`)
+    bits.push(
+      call.durationMs >= 1000 ? `${(call.durationMs / 1000).toFixed(1)}s` : `${call.durationMs}ms`,
+    )
   }
   return bits.join(' · ')
 }
@@ -37,43 +41,51 @@ function summarise(call: ToolCall): string {
 export function ToolCallCard({ call }: { call: ToolCall }) {
   const [open, setOpen] = useState(false)
   const Icon = STATUS_ICON[call.status]
-  const expandable = Boolean(call.detail) || Boolean(call.error)
+  const failed = call.status === 'failed'
+  const expandable = Boolean(call.detail) || failed
   const summary = summarise(call)
 
   return (
-    <div className="my-1.5 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--secondary)]">
+    <div>
       <button
         type="button"
         disabled={!expandable}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={expandable ? open : undefined}
-        className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors enabled:hover:bg-[var(--card)] disabled:cursor-default"
+        className={`flex min-h-[34px] w-full items-center gap-2.5 text-left text-[12px] transition-colors enabled:hover:text-[var(--foreground)] disabled:cursor-default ${
+          failed ? 'text-[var(--destructive)]' : 'text-[var(--muted-foreground)]'
+        }`}
       >
         <Icon
-          size={14}
-          className={`shrink-0 ${STATUS_CLASS[call.status]} ${call.status === 'running' ? 'animate-spin' : ''}`}
+          size={13}
+          className={`shrink-0 ${
+            call.status === 'running'
+              ? 'text-[var(--primary)]'
+              : failed
+                ? 'text-[var(--destructive)]'
+                : 'text-[var(--foreground-ghost)]'
+          } ${call.status === 'running' ? 'animate-spin' : ''}`}
           aria-hidden
         />
-        <span className="shrink-0 text-[13px] font-medium text-[var(--foreground)]">{call.label}</span>
+
+        <span className="shrink-0 font-medium text-[var(--foreground)]">{call.label}</span>
 
         {call.source && (
-          <span className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--border)] px-1.5 py-px text-[11px] text-[var(--foreground-faint)]">
+          <span className="shrink-0 text-[11px] text-[var(--foreground-ghost)]">
             {DATA_SOURCE_LABEL[call.source]}
           </span>
         )}
 
-        <span className="mono min-w-0 flex-1 truncate text-[11px] text-[var(--foreground-faint)]">
+        <span className="mono min-w-0 flex-1 truncate text-[11px] text-[var(--foreground-ghost)]">
           {call.name}
         </span>
 
-        {summary && (
-          <span className="tnum shrink-0 text-[11px] text-[var(--foreground-soft)]">{summary}</span>
-        )}
+        {summary && <span className="tnum shrink-0 text-[11px]">{summary}</span>}
 
         {expandable && (
           <ChevronRight
             size={13}
-            className={`shrink-0 text-[var(--foreground-ghost)] transition-transform duration-[var(--motion-fast)] ${
+            className={`shrink-0 text-[var(--foreground-ghost)] transition-transform duration-[150ms] ${
               open ? 'rotate-90' : ''
             }`}
             aria-hidden
@@ -82,11 +94,11 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
       </button>
 
       {open && expandable && (
-        <div className="anim-disclose border-t border-[var(--border)] px-3 py-2">
-          {call.error ? (
-            <p className="text-[12px] text-[var(--destructive)]">{call.error}</p>
+        <div className="anim-disclose mb-3 ml-[7px] border-l border-[var(--border)] pb-1 pl-[18px]">
+          {failed ? (
+            <p className="py-2 text-[12px] text-[var(--destructive)]">{call.error}</p>
           ) : (
-            <pre className="mono max-h-56 overflow-auto whitespace-pre-wrap break-all text-[11.5px] leading-relaxed text-[var(--foreground-soft)]">
+            <pre className="mono max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-[var(--radius-md)] bg-[var(--secondary)] p-3 text-[12px] leading-relaxed text-[color-mix(in_srgb,var(--foreground)_88%,var(--muted-foreground))]">
               {call.detail}
             </pre>
           )}

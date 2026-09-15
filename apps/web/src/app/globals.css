@@ -354,18 +354,6 @@ body {
   }
 }
 
-/* 流式输出光标 */
-@keyframes caret-pulse {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  55%,
-  100% {
-    opacity: 0.15;
-  }
-}
-
 /* 思考指示：三点依次呼吸 */
 @keyframes dots-breathe {
   0%,
@@ -417,16 +405,6 @@ body {
   animation: sticker-pop var(--motion-slow) var(--motion-ease-out) both;
 }
 
-.caret {
-  display: inline-block;
-  width: 0.5em;
-  height: 1.05em;
-  margin-left: 1px;
-  vertical-align: text-bottom;
-  background: var(--foreground-faint);
-  animation: caret-pulse 1.05s steps(1, end) infinite;
-}
-
 .dot {
   animation: dots-breathe 1.25s var(--motion-ease-standard) infinite;
 }
@@ -446,10 +424,6 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-  .caret {
-    animation: none;
-    opacity: 1;
   }
 }
 

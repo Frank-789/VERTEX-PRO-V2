@@ -1,21 +1,26 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
-import { useState } from 'react'
-import { messageToPlainText, type Message } from '@/lib/types'
+import { messageToPlainText, type Block, type Message } from '@/lib/types'
 import { RichText } from './RichText'
 import { ToolCallCard } from './ToolCallCard'
 
 /**
  * 一条消息。
  *
- * 刻意不做左右分栏的气泡头像 —— 那是 IM 的语汇。
- * 这里是一个工作台：用户发言用左侧竖线标记，助手回复直接铺陈。
- * 长回答因此可以占满行宽，读起来像文档而不是聊天记录。
+ * 版式学自 OpenAlice 的公开设计文档：
+ *   · 用户发言 —— 右对齐的浅色气泡（20px 圆角，secondary 底色，最大 88% 宽）
+ *   · 助手回复 —— 直接铺在画布上，无气泡无描边，占满阅读宽度
+ *
+ * 这个不对称是有意的：用户的话是「一句话」，助手的话是「一份东西」。
+ * 两边都套气泡的话，长回答会被挤成窄条，读起来很累。
+ *
+ * 用户输入**不做 Markdown 渲染** —— 他打 `**粗体**` 就该原样看到那两个星号，
+ * 而不是被悄悄变成粗体。
  */
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, alwaysVisible }: { text: string; alwaysVisible?: boolean }) {
   const [done, setDone] = useState(false)
   return (
     <button
@@ -24,13 +29,15 @@ function CopyButton({ text }: { text: string }) {
         try {
           await navigator.clipboard.writeText(text)
           setDone(true)
-          setTimeout(() => setDone(false), 1400)
+          setTimeout(() => setDone(false), 2000)
         } catch {
           /* 剪贴板不可用时静默失败，不打断阅读 */
         }
       }}
-      className="flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-1 text-[11px] text-[var(--foreground-ghost)] opacity-0 transition-opacity duration-[var(--motion-fast)] group-hover:opacity-100 focus-visible:opacity-100 hover:text-[var(--foreground-soft)]"
-      aria-label={done ? '已复制' : '复制回答'}
+      className={`flex items-center gap-1 rounded-[var(--radius-sm)] px-1.5 py-1 text-[11px] text-[var(--foreground-ghost)] transition-opacity duration-[var(--motion-fast)] hover:text-[var(--foreground-soft)] focus-visible:opacity-100 group-hover:opacity-100 ${
+        alwaysVisible ? 'opacity-100' : 'opacity-0'
+      }`}
+      aria-label={done ? '已复制' : '复制'}
     >
       {done ? <Check size={12} /> : <Copy size={12} />}
       {done ? '已复制' : '复制'}
@@ -38,58 +45,74 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export const MessageItem = memo(function MessageItem({ message }: { message: Message }) {
-  const isUser = message.role === 'user'
+/** 助手回答里「过程性」的文字：退到后景，让最终结论跳出来。 */
+function isProgressText(blocks: Block[], index: number): boolean {
+  for (let i = index + 1; i < blocks.length; i++) {
+    if (blocks[i].kind === 'text') return true
+  }
+  return false
+}
+
+export const MessageItem = memo(function MessageItem({
+  message,
+  isLatest,
+}: {
+  message: Message
+  isLatest?: boolean
+}) {
   const plain = messageToPlainText(message)
 
-  if (isUser) {
+  if (message.role === 'user') {
     return (
-      <div className="anim-msg-in group flex gap-3 py-3">
-        <div
-          className="mt-0.5 w-[2px] shrink-0 self-stretch rounded-full bg-[var(--input)]"
-          aria-hidden
-        />
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 text-[11px] font-medium tracking-wide text-[var(--foreground-faint)]">
-            你
-          </div>
-          <div className="whitespace-pre-wrap break-words text-[14.5px] text-[var(--foreground)]">
+      <article className="anim-msg-in group flex flex-col items-end">
+        <div className="max-w-[min(88%,42rem)] rounded-[20px] bg-[var(--secondary)] px-4 py-3">
+          <div className="whitespace-pre-wrap break-words text-[14px] leading-[1.62] text-[var(--foreground)]">
             {plain}
           </div>
         </div>
-        <CopyButton text={plain} />
-      </div>
+        <div className="mt-1.5 flex min-h-[28px] items-center">
+          <CopyButton text={plain} alwaysVisible={isLatest} />
+        </div>
+      </article>
     )
   }
 
   return (
-    <div className="anim-msg-in group flex gap-3 py-3">
-      <div
-        className="mt-0.5 w-[2px] shrink-0 self-stretch rounded-full bg-[var(--primary)] opacity-70"
-        aria-hidden
-      />
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 text-[11px] font-medium tracking-wide text-[var(--foreground-faint)]">
-          Vertex
-        </div>
-
+    <article className="anim-msg-in group flex flex-col">
+      <div className="grid gap-5">
         {message.blocks.map((block, i) => {
           if (block.kind === 'tool') return <ToolCallCard key={i} call={block.call} />
           if (block.kind === 'sticker') {
             return <RichText key={i} text={`[[sticker/${block.file}]]`} />
           }
-          return <RichText key={i} text={block.text} />
+          return (
+            <div
+              key={i}
+              className={
+                isProgressText(message.blocks, i)
+                  ? 'text-[color-mix(in_srgb,var(--foreground)_88%,var(--muted-foreground))]'
+                  : undefined
+              }
+            >
+              <RichText text={block.text} />
+            </div>
+          )
         })}
-
-        {message.streaming && (
-          <div className="mt-2 flex items-center gap-1.5" aria-label="正在输入">
-            <span className="dot h-1.5 w-1.5 rounded-full bg-[var(--foreground-faint)]" />
-            <span className="dot h-1.5 w-1.5 rounded-full bg-[var(--foreground-faint)]" />
-            <span className="dot h-1.5 w-1.5 rounded-full bg-[var(--foreground-faint)]" />
-          </div>
-        )}
       </div>
-      {!message.streaming && plain && <CopyButton text={plain} />}
-    </div>
+
+      {message.streaming && (
+        <div className="mt-3 flex items-center gap-1.5" aria-label="正在输入">
+          <span className="dot h-1.5 w-1.5 rounded-full bg-[var(--foreground-faint)]" />
+          <span className="dot h-1.5 w-1.5 rounded-full bg-[var(--foreground-faint)]" />
+          <span className="dot h-1.5 w-1.5 rounded-full bg-[var(--foreground-faint)]" />
+        </div>
+      )}
+
+      {!message.streaming && plain && (
+        <div className="mt-1.5 flex min-h-[28px] items-center">
+          <CopyButton text={plain} alwaysVisible={isLatest} />
+        </div>
+      )}
+    </article>
   )
 })
