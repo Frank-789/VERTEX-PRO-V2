@@ -295,12 +295,24 @@ git push origin main                → Recv failure: Operation timed out
 它还带一道保险：**如果远端已经不是本地父提交，就拒绝推**，不会覆盖别人的东西。
 token 只从 `GH_TOKEN` 环境变量读，不落盘。
 
-**所以只差一样东西：一个新的 PAT**（`repo` 或 `contents: write` 权限即可）。
-拿到之后：
+**所以只差一样东西：一个有 `Contents: Read and write` 权限的 PAT。**
+
+> **当前卡在这里（2026-09-15）**：用户给了一个 fine-grained PAT，
+> 但它的 **Contents 权限只给了 Read**，写 blob 时 403：
+> `x-accepted-github-permissions: contents=write`。
+> 读取正常（`GET /contents/README.md` → 200），所以是**权限范围不够，不是 token 无效**。
+> 修法：去 https://github.com/settings/personal-access-tokens 编辑该 token，
+> **Repository permissions → Contents 改成 Read and write**，保存后重跑即可，**不用重新生成**。
 
 ```bash
-GH_TOKEN=<新token> python3 /tmp/git_push_api.py
+GH_TOKEN=<token> python3 /tmp/git_push_range.py \
+    /Users/lxk/Desktop/Vertex/VERTEX-PRO-V2 Frank-789/VERTEX-PRO-V2 main
 ```
+
+`git_push_range.py` 是 `git_push_api.py` 的**多提交版本** —— 后者只重放 HEAD 一个提交，
+这里要推 3 个。它会按 `git rev-list --reverse remote..HEAD` 的顺序逐个重放
+（blob → tree → commit），最后一个生成后再移动 ref；`--diff-filter=D` 的删除
+用 `sha: null` 表达。
 
 > 顺带提醒：`部署流程.txt` 里那个 PAT 是**明文**存的，既然已经失效了，
 > 建议把它从文件里删掉。以后别再把 token 写进会同步、会被截图的地方。
