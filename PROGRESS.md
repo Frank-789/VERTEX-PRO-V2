@@ -37,9 +37,10 @@ GitHub 呈现按 OpenAlice 的排布补齐一轮；Phase 4 的**后端容器化�
   - OpenAlice 是交易机器人，VertEx 是电商 —— 功能不能照搬，架构可以
   - Alice 的运行时要常驻进程 + 持久文件系统 + spawn 子进程，**结构上不可能跑在 Vercel**
 - [x] 建 MIT `LICENSE`（版权人：罗鑫坤 / Frank-789）
-- [x] 写 `README.md`（按 OpenAlice 的呈现方式：徽章 → 一句话定位 → 状态横幅 → 功能表 → 技术栈表 → 架构图 → 部署）
 - [x] 写 `.gitignore`（重点：`.env`、`data/*`、`prompts/user/`）
 - [x] 把方案文档推成了 V2 仓库的第一个 commit
+- [x] `README.md` —— **2026-09-27 已完全重写**，见下面「GitHub 呈现」小节。
+      （初版是纯文字表格、无图；现在是 OpenAlice 那种「功能小节 + 并排截图 + 一句说明」）
 
 ### 表情包（这是「人性化」的关键）
 
@@ -151,19 +152,65 @@ GitHub 呈现按 OpenAlice 的排布补齐一轮；Phase 4 的**后端容器化�
 - [x] `npm run build` 通过，TypeScript 无错
 - [x] 浅色 / 深色两套色板都截图确认
 
+### GitHub 呈现（2026-09-27）
+
+- [x] `README.md` 按 OpenAlice 的排布重写：居中 logo → 标题 + 一句话 → 徽章 →
+      大截图 → 快速开始 → 功能（### 小节各配图）→ 架构 → 部署 → 文档 → 路线图 → 许可证
+- [x] `docs/images/` 五张实拍截图 + 一个 logo（都是本地跑起来真截的，不是效果图）
+      —— `hero-chat` / `chat-answer` / `chat-dark` / `landing` / `stickers` / `logo-wave`
+- [x] 仓库 topics（12 个）+ description 精简到一行 + homepage
+- [x] `CHANGELOG.md`、`CONTRIBUTING.md`、`.gitattributes`
+- [x] `docs/` 从 1 篇补到 3 篇（加 `02-部署指南.md`、`03-配置参考.md`）
+- [x] `.github/workflows/ci.yml` —— 三个 job：后端冒烟测试 / 前端构建 / **密钥扫描**
+  - ⚠️ **写了但还没推上去**：推送 `.github/workflows/` 下的文件要求 token 具备
+    **`workflow` 作用域**，当前 token 只有 `repo`。GitHub 会直接拒绝：
+    `refusing to allow a Personal Access Token to create or update workflow ... without workflow scope`
+  - Contents API 那条路也走不通（GitHub 返回 404 防探测，不是 403）
+  - **解法**：去 https://github.com/settings/tokens 给 token 勾上 `workflow`，然后重推
+
+### 后端容器化（2026-09-27）
+
+- [x] `apps/api/Dockerfile` —— 多阶段构建，tini 作 PID 1、非 root（UID 10001）、
+      `HEALTHCHECK` 用 python 探活（省掉装 curl）、`/data` 卷、`ALLOW_DEV_CORS=0`
+- [x] `docker-compose.yml` —— 端口只绑 `127.0.0.1:8000`（后端无鉴权，不该裸暴露）、
+      `restart: unless-stopped`、`stop_grace_period: 30s`、日志轮转 10m×3
+- [x] `.dockerignore` —— 密钥 / 依赖 / 构建产物 / `data/` / 文档一律不进镜像
+- [x] 路径逻辑已在**模拟的容器目录结构**下验证：
+      `/app/apps/api/src/core/paths.py` → `parents[4]` = `/app`，不越界
+
+> ⚠️ **镜像尚未实际构建过** —— 开发机上没有 Docker。
+> 首次构建若失败，优先查 `requirements.txt` 在 `python:3.11-slim` 上的兼容性。
+>
+> ⚠️ **目录层级不能改**：`paths.py` 靠 `parents[4]` 推仓库根，
+> 把 `apps/api/src/` 打平会让所有路径解析**静默失败**。Dockerfile 里有注释标了这一点。
+
 ---
 
 ## 三、还没做的
 
-### Phase 0 止血（**最高优先级，代码再漂亮也挡不住密钥泄露**）
+### Phase 0 止血（**最高优先级**）
 
-- [ ] 轮换两个泄露的 GitHub PAT（写在 `~/Desktop/部署流程.txt` 里，明文）
-- [ ] 轮换泄露的 DeepSeek key（`sk-1b1de9af...`，**曾提交在公开仓库的 `.env.example`**）
-- [ ] 轮换 Apify token（`apify_api_4kwI...`，用户说别泄露，目前只存在本地 `.env`）
-- [ ] 用 `git filter-repo` 从 VERTEX-pro 历史里彻底抹掉那个 key（改文件没用，历史还在）
-- [ ] 删掉上一代前端里的三个 `NEXT_PUBLIC_*` 密钥（会打包进浏览器，人人可见）
-- [ ] Dockerfile 补 `playwright install chromium`（第一代容器里没浏览器，采集工具全废）
-- [ ] 修 `render.yaml`
+> ⚠️ **下面全部是「第一代 `VERTEX-pro`」的遗留问题，不是 V2 的。**
+> V2 从第一天就没犯这些错 —— 无 `NEXT_PUBLIC_*`、无硬编码路径、无伪造数据。
+> 但**只要 V1 还在线上、旧 git 历史还在 GitHub 上，风险就还在**。
+
+**密钥轮换（只能你本人去各家控制台操作）：**
+
+- [ ] DeepSeek key（`sk-1b1de9af...`）—— **曾提交在公开仓库的 `.env.example`**，被爬虫收录过，最紧急
+- [ ] Apify token（`apify_api_4kwI...`）—— 只在本机 `.env`，但保险起见也换掉
+- [ ] GitHub PAT —— 见第七节。`~/Desktop/Github终端更新指令.txt` 里那个 **目前仍然有效**，
+      明文存桌面、且已在对话里出现过。**建议轮换并从文件删除**
+
+**代码与历史清理：**
+
+- [ ] 用 `git filter-repo` 从 `VERTEX-pro` 历史里抹掉那张 key（**只改文件没用，历史还在**）
+- [ ] V1 前端的三个 `NEXT_PUBLIC_*` 密钥（会打包进浏览器，人人可见）
+- [ ] V1 的 `render.yaml`（`repo:` 还是占位符，且没声明爬虫环境变量）
+- [ ] V1 的 Dockerfile 缺 `playwright install chromium`（容器里没浏览器，采集工具全废）
+
+> 📌 注意：**V2 的 Dockerfile 不需要 playwright** —— V2 的三个工具
+> （`profit.calc` / `ebay.search` / `apify.scrape`）都不依赖浏览器。
+> 上面这条是第一代的问题，别照搬过来。
 
 ### Phase 2 持久化
 
@@ -183,36 +230,9 @@ GitHub 呈现按 OpenAlice 的排布补齐一轮；Phase 4 的**后端容器化�
       `document.documentElement.setAttribute(...)`。差一个下拉
 - [ ] 落地页 `page.tsx` 还没按新规格重排过（这轮只动了对话页）
 
-### Phase 4 部署与呈现
+### Phase 4 剩下的
 
-**呈现部分已完成（2026-09-27）：**
-
-- [x] `README.md` 按 OpenAlice 的排布重写：居中 logo → 标题 + 一句话 → 徽章 →
-      大截图 → 快速开始 → 功能（### 小节各配图）→ 架构 → 部署 → 文档 → 路线图 → 许可证
-- [x] `docs/images/` 五张实拍截图 + 一个 logo（都是本地跑起来真截的，不是效果图）
-      —— `hero-chat` / `chat-answer` / `chat-dark` / `landing` / `stickers` / `logo-wave`
-- [x] 仓库 topics（12 个）+ description 精简到一行 + homepage
-- [x] `.github/workflows/ci.yml` —— 三个 job：后端冒烟测试 / 前端构建 / **密钥扫描**
-- [x] `CHANGELOG.md`、`CONTRIBUTING.md`、`.gitattributes`
-- [x] `docs/` 从 1 篇补到 3 篇（加 `02-部署指南.md`、`03-配置参考.md`）
-
-**部署部分（2026-09-27）：**
-
-- [x] `apps/api/Dockerfile` —— 多阶段构建，tini 作 PID 1、非 root（UID 10001）、
-      `HEALTHCHECK` 用 python 探活（省掉装 curl）、`/data` 卷、`ALLOW_DEV_CORS=0`
-- [x] `docker-compose.yml` —— 端口只绑 `127.0.0.1:8000`（后端无鉴权，不该裸暴露）、
-      `restart: unless-stopped`、`stop_grace_period: 30s`、日志轮转 10m×3
-- [x] `.dockerignore` —— 密钥 / 依赖 / 构建产物 / `data/` / 文档一律不进镜像
-- [x] 路径逻辑已在**模拟的容器目录结构**下验证：
-      `/app/apps/api/src/core/paths.py` → `parents[4]` = `/app`，不越界
-
-> ⚠️ **镜像尚未实际构建过** —— 开发机上没有 Docker。
-> 首次构建若失败，优先查 `requirements.txt` 在 `python:3.11-slim` 上的兼容性。
->
-> ⚠️ **目录层级不能改**：`paths.py` 靠 `parents[4]` 推仓库根，
-> 把 `apps/api/src/` 打平会让所有路径解析**静默失败**。Dockerfile 里有注释标了这一点。
-
-**还没做：**
+> 「GitHub 呈现」与「后端容器化」**已完成**，见「二、已经做完的」里对应的两个小节。
 
 - [ ] Vercel 部署（Root Directory 要设成 `apps/web`，环境变量加 `API_ORIGIN`）
 - [ ] GitHub Releases 打包桌面版
@@ -259,8 +279,11 @@ cd apps/api && .venv/bin/python tests/test_smoke.py    # 不需 key
 | 切色板后颜色不跟着变 | Tailwind 会在构建期把 `@theme` 的值烤死 | 用 `@theme inline`，让工具类输出 `var(...)` 而不是字面值 |
 | 表情包渲染不出来 | `StickerBubble` 用了 `width/height=160` 的定值，但 SVG 是 240×240 | 属性给 160（占位防抖），`style` 里放 `width/height:auto` + `maxWidth/maxHeight` 限幅 |
 | 顺手改小表情尺寸，改完没生效 | 四个色板上方的 `@theme inline` 里还留着指向已删变量的映射行 | 删变量时**连映射一起删**，否则指向 undefined（`sed` 批量替换特别容易漏） |
-| 沙箱里 `git push` 卡死 75 秒 | 沙箱内 **github.com:443 被拦**，`api.github.com` 和 `raw.githubusercontent.com` 却通 | 诊断用 `dangerouslyDisableSandbox: true`（能通）。**推不上去是凭证问题，不是网络问题**，见第七节 |
-| 装了 `gh` 也推不了？先别装 | `gh` 没装、keychain 里没有 github.com 条目、文档里那个 PAT 已失效（401） | 别绕，直接让用户给新 PAT 或自己推 |
+| 沙箱里 `git push` 卡死 75 秒 | **github.com:443 是间歇性被拦**，不是稳定被墙。`api.github.com` 和 `raw.githubusercontent.com` 始终通 | **先 `curl https://github.com/` 探一下**再下结论。见第七节 |
+| 以为「推不上去」只有一个原因 | 实际是**两个独立问题叠加**：网络间歇 + 本机无凭证。只解决一个仍然推不动 | 分开验证：先测连通性，再测凭证（`curl -H "Authorization: Bearer $TOK" api.github.com/user`） |
+| 翻遍桌面也找不到可用 token | 能用的那个在 `Github终端更新指令.txt`，不在 `部署流程.txt`（后者那个已失效） | 找凭证时**两个文件都要翻** |
+| `.github/workflows/` 推不上去 | token 只有 `repo` 作用域，推送 workflow 文件需要额外的 **`workflow` 作用域** | 去 token 设置勾上 `workflow`。**Contents API 绕不过去**（GitHub 返回 404 防探测） |
+| 想验证 Docker 镜像但本机没 Docker | 开发机上没装 Docker | 退而求其次：**用模拟的目录结构验证 `paths.py` 的层级推算**（已是这么做的）。但版本兼容性必须在真镜像里才能验 |
 
 ---
 
@@ -274,7 +297,14 @@ cd apps/api && .venv/bin/python tests/test_smoke.py    # 不需 key
    如果他的前提有误（比如「OpenAlice 没部署到 Vercel」），
    拿证据纠正他，别顺着说。
 5. `.env` 已经在 `.gitignore` 里且 `chmod 600`。**永远不要提交它。**
-6. 本仓库**每次提交前扫一遍密钥**（这轮 67 个文件扫过，干净）。
+6. 本仓库**每次提交前扫一遍密钥**。`.github/workflows/ci.yml` 里有自动化的
+   密钥扫描 job（推上去之后生效）。
+7. **他自己的教程未必是最优解，照做之前先看一眼。** 例：`部署流程.txt` 教的是
+   `git remote set-url origin https://TOKEN@...` 推完再改回来 —— 这会把 token
+   写进 `.git/config`。改成 **一次性 URL**（`git push https://TOKEN@host/repo.git main`）
+   效果一样但不在任何地方落盘。用户接受这类改进，**说明理由即可**。
+8. **截图要真跑真截**，不要拿效果图充数。这轮的 5 张图是起了
+   mock_provider + FastAPI + Next.js 完整链路、让 Agent 真跑完一轮工具调用后截的。
 
 ---
 
