@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一个分支连续推送时，取消上一次还没跑完的
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: 后端 · 冒烟测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: 安装依赖
+        working-directory: apps/api
+        run: pip install -r requirements.txt
+
+      # 这 21 项不需要任何 API key，也不需要网络 —— 用 dev/mock_provider.py 的假供应商
+      - name: 冒烟测试
+        working-directory: apps/api
+        run: python tests/test_smoke.py
+
+  web:
+    name: 前端 · 构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: 安装依赖
+        working-directory: apps/web
+        run: npm ci
+
+      # next build 同时承担 TypeScript 类型检查
+      - name: 构建
+        working-directory: apps/web
+        run: npm run build
+
+  secrets:
+    name: 密钥扫描
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 第一代把一个真实可用的 DeepSeek key 提交进了公开仓库的 .env.example，
+      # 被爬虫收录。这道闸门保证不会再发生。
+      - name: 扫描明文密钥
+        run: |
+          set -e
+          PATTERNS='sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,}|apify_api_[a-zA-Z0-9]{10,}|AKIA[0-9A-Z]{16}'
+          if grep -rInE "$PATTERNS" . \
+               --exclude-dir=.git \
+               --exclude-dir=node_modules \
+               --exclude-dir=.next \
+               --exclude-dir=.venv; then
+            echo "::error::发现疑似明文密钥，请立即移除并轮换"
+            exit 1
+          fi
+          echo "✅ 未发现明文密钥"
+
+      - name: 检查前端未使用 NEXT_PUBLIC_ 密钥
+        run: |
+          set -e
+          if grep -rIn "NEXT_PUBLIC_.*KEY\|NEXT_PUBLIC_.*TOKEN\|NEXT_PUBLIC_.*SECRET" apps/web/src apps/web/.env.example 2>/dev/null; then
+            echo "::error::前端出现 NEXT_PUBLIC_* 密钥 —— 它会被打包进浏览器，人人可见"
+            exit 1
+          fi
+          echo "✅ 前端无 NEXT_PUBLIC_ 密钥"
