@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { Composer } from '@/components/conversation/Composer'
 import { ConversationTranscript } from '@/components/conversation/ConversationTranscript'
+import { PaletteMenu } from '@/components/PaletteMenu'
+import { MEASURE_PADDING } from '@/lib/surface'
 import { useChat } from '@/lib/useChat'
 
 function ChatSurface() {
@@ -35,6 +37,8 @@ function ChatSurface() {
 
         <div className="flex-1" />
 
+        <PaletteMenu />
+
         {messages.length > 0 && (
           <button
             type="button"
@@ -62,7 +66,7 @@ function ChatSurface() {
       {error && (
         <div
           role="alert"
-          className="mx-[max(24px,calc((100%-736px)/2))] mb-1 grid gap-1 rounded-[10px] border border-[color-mix(in_srgb,var(--destructive)_50%,var(--border))] p-3 text-[12px] text-[var(--destructive)]"
+          className={`mb-1 grid gap-1 rounded-[10px] border border-[color-mix(in_srgb,var(--destructive)_50%,var(--border))] p-3 text-[12px] text-[var(--destructive)] ${MEASURE_PADDING}`}
         >
           <strong className="font-semibold">没能继续</strong>
           <span>{error}</span>

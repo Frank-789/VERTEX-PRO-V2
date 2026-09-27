@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, Square } from 'lucide-react'
+import {
+  MAX_HEIGHT,
+  MEASURE_PADDING,
+  MIN_HEIGHT,
+  SHELL_SHADOW,
+  SHELL_SHADOW_FOCUS,
+} from '@/lib/surface'
 
 /**
  * 输入框。
@@ -19,22 +26,10 @@ import { ArrowUp, Square } from 'lucide-react'
  *
  * 高度随内容自增，上限 168px 后内部滚动 —— 长问题不被裁掉，
  * 又不会把对话挤没。
+ *
+ * 阴影与高度来自 `@/lib/surface`，与首页的提问框同源 ——
+ * 那两个是同一个东西的两种状态，不能各写一份。
  */
-
-const MIN_HEIGHT = 68
-const MAX_HEIGHT = 168
-
-const SHELL_SHADOW =
-  '0 0 0 1px color-mix(in srgb, var(--foreground) 4%, transparent), ' +
-  '0 2px 8px color-mix(in srgb, var(--foreground) 4%, transparent), ' +
-  '0 14px 52px color-mix(in srgb, var(--foreground) 8%, transparent), ' +
-  'inset 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)'
-
-const SHELL_SHADOW_FOCUS =
-  '0 0 0 1px color-mix(in srgb, var(--foreground) 5%, transparent), ' +
-  '0 2px 8px color-mix(in srgb, var(--foreground) 5%, transparent), ' +
-  '0 14px 52px color-mix(in srgb, var(--foreground) 10%, transparent), ' +
-  'inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent)'
 
 export function Composer({
   onSend,
@@ -89,7 +84,7 @@ export function Composer({
   const canSend = value.trim().length > 0 && !streaming && !disabled
 
   return (
-    <div className="shrink-0 px-[max(24px,calc((100%-736px)/2))] pt-3 pb-5">
+    <div className={`shrink-0 pt-3 pb-5 ${MEASURE_PADDING}`}>
       <div
         className="rounded-[26px] bg-[color-mix(in_srgb,var(--card)_94%,transparent)] px-3 pt-3 pb-2.5 transition-shadow duration-[var(--motion-fast)] focus-within:shadow-[var(--shell-shadow-focus)]"
         style={
@@ -102,6 +97,7 @@ export function Composer({
         <textarea
           ref={ref}
           rows={1}
+          name="message"
           value={value}
           disabled={disabled}
           placeholder={placeholder}
