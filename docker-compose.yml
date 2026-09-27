@@ -1,0 +1,59 @@
+# 后端自托管。
+#
+#     cp .env.example .env    # 填上 DEEPSEEK_API_KEY
+#     docker compose up -d
+#     curl localhost:8000/health
+#
+# 前端不在这里 —— 它跑在 Vercel 上（见 docs/02-部署指南.md）。
+#
+# 注意端口绑定：默认只绑 127.0.0.1。
+# 后端持有全部密钥、且目前**没有鉴权**，不该裸暴露到公网。
+# 要远程访问请走 HTTPS 反代或 SSH 隧道。
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: vertex-api:latest
+    container_name: vertex-api
+
+    # 只有回环地址 —— 别改成 "8000:8000"，那等于把无鉴权的后端挂到公网
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    # 密钥从 .env 读，不进镜像、不进版本库
+    env_file:
+      - .env
+    environment:
+      DATA_HOME: /data
+      # 生产走 Vercel 的同源代理，不需要 CORS
+      ALLOW_DEV_CORS: "0"
+      LOG_LEVEL: INFO
+
+    volumes:
+      # 会话 / 事件 / 任务全部落在这里，容器重建不丢
+      - vertex-data:/data
+
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  vertex-data:

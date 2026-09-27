@@ -14,9 +14,43 @@
 - Phase 0 收尾：轮换第一代泄露的凭证，用 `git filter-repo` 清理旧仓库历史
 - Phase 2 持久化：事件日志落盘、领域数据进 Postgres
 - Phase 3 自动化：`issues/*.md` + `when:` frontmatter 文件自调度 → Store Pilot 真实化
-- Phase 4 部署：`Dockerfile` + `docker-compose.yml`（tini / 非 root / healthcheck / `/data` 卷）
 - 色板切换器 UI（机制已就绪，界面上还没有入口）
 - 落地页按新设计规格重排
+- 后端鉴权（目前所有端点无鉴权，因此仅绑回环地址）
+
+---
+
+## 2026-09-27
+
+### 新增
+
+- **`Dockerfile` + `docker-compose.yml`** —— 后端可自托管
+  - `tini` 作 PID 1、非 root（UID 10001）、`HEALTHCHECK` 打 `/health`
+  - `/data` 持久卷；端口默认只绑 `127.0.0.1`（后端持有全部密钥且无鉴权）
+  - 构建必须在仓库根执行（镜像需要 `config/` 与 `prompts/`）
+- **`.dockerignore`** —— 密钥、依赖、构建产物、运行期状态、文档一律不进镜像
+- **`.github/workflows/ci.yml`** —— 三个 job：后端冒烟测试 / 前端构建 / 密钥扫描
+- **`CHANGELOG.md`**、**`CONTRIBUTING.md`**、**`.gitattributes`**
+- **`docs/02-部署指南.md`**、**`docs/03-配置参考.md`**
+- `docs/images/` —— 5 张本地实拍截图 + logo
+
+### 变更
+
+- **`README.md` 按 OpenAlice 的排布完全重写**：居中 logo → 标题 → 徽章 → 大截图 →
+  快速开始 → 功能（### 小节各配图）→ 架构 → 部署 → 文档 → 路线图 → 许可证
+- 仓库 description 精简为一行，补齐 12 个 topics
+
+### 修复
+
+- **解除推送堵点** —— 之前 `github.com:443` 间歇性不可达且本机无可用凭证；
+  现 `git push` 直接可用（用一次性 URL，token 不落盘）
+
+### 已知限制
+
+- 镜像**尚未实际构建验证**（开发机没有 Docker）。路径解析逻辑已在
+  模拟的容器目录结构下验证通过，但 `requirements.txt` 的版本兼容性未在
+  `python:3.11-slim` 上实测
+- `.github/workflows/ci.yml` 因 token 缺少 `workflow` 作用域暂未推送
 
 ---
 

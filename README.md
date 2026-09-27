@@ -150,8 +150,20 @@ docs/      方案与部署文档
 | 前端 | Vercel | Next.js 纯 UI，经同源代理转发 |
 | 后端 | Docker | 常驻进程，持久卷挂载 `/data` |
 
+后端一行起：
+
+```bash
+cp .env.example .env    # 填 DEEPSEEK_API_KEY
+docker compose up -d
+curl localhost:8000/health
+```
+
+端口默认只绑 `127.0.0.1` —— 后端持有全部密钥且**目前没有鉴权**，不该裸暴露公网。
+
 > 智能体运行时需要**常驻进程 + 持久文件系统 + 定时调度**，无法运行在 Serverless 环境。
 > Vercel 只承载 UI 这一层。
+
+逐步说明见 [docs/02-部署指南.md](docs/02-部署指南.md)。
 
 ## 文档
 
@@ -175,10 +187,11 @@ cd apps/web && npm run build                          # TypeScript 类型检查 
 
 - [x] 前后端打通，对话端到端可跑（工具调用 + 流式 + 表情包）
 - [x] 对话界面按公开设计规格重排
-- [ ] Phase 0 止血：轮换泄露的密钥，清掉第一代的 `NEXT_PUBLIC_*`
+- [x] 前端止血：清掉第一代的 `NEXT_PUBLIC_*` 密钥，改同源代理
+- [x] Phase 4 部署：`Dockerfile` + `docker-compose.yml`（tini / 非 root / healthcheck / `/data` 卷）
+- [ ] Phase 0 收尾：轮换第一代泄露的凭证，清理旧仓库 git 历史
 - [ ] Phase 2 持久化：事件日志落盘、领域数据进 Postgres
 - [ ] Phase 3 自动化：`issues/*.md` + `when:` 文件自调度 → Store Pilot 真实化
-- [ ] Phase 4 部署：Docker 契约（tini / 非 root / healthcheck / `/data` 卷）
 
 ## 许可证
 

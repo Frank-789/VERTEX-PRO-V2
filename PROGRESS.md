@@ -4,12 +4,11 @@
 > 任何人（或任何 AI）接手时，先读这里，再读 `docs/01-架构重构方案.md`。
 > 规则：每完成一件事就更新这里，别攒着写。
 
-**最后更新**：2026-09-27
-**当前阶段**：**代码已推送成功** —— 卡了 12 天的堵点解除（详见第七节）。
-GitHub 呈现已按 OpenAlice 的排布补齐一轮：README 重写并配 5 张实拍截图、
-仓库 topics / description、CI 工作流、CHANGELOG / CONTRIBUTING / `.gitattributes`、
-`docs/` 从 1 篇补到 3 篇。
-下一步：Phase 4 部署（`Dockerfile` + `docker-compose.yml`），以及色板切换器 UI。
+**最后更新**：2026-09-27（第二次）
+**当前阶段**：**代码已推送成功**（卡了 12 天的堵点解除，见第七节）。
+GitHub 呈现按 OpenAlice 的排布补齐一轮；Phase 4 的**后端容器化也已完成** ——
+`Dockerfile` + `docker-compose.yml` + `.dockerignore` 都写好了。
+下一步：Vercel 部署前端，然后做色板切换器 UI 和落地页重排。
 
 ---
 
@@ -197,12 +196,27 @@ GitHub 呈现已按 OpenAlice 的排布补齐一轮：README 重写并配 5 张�
 - [x] `CHANGELOG.md`、`CONTRIBUTING.md`、`.gitattributes`
 - [x] `docs/` 从 1 篇补到 3 篇（加 `02-部署指南.md`、`03-配置参考.md`）
 
-**部署部分仍未落地：**
+**部署部分（2026-09-27）：**
 
-- [ ] `Dockerfile` 多阶段构建（tini / 非 root / healthcheck / `/data` 卷）
-- [ ] `docker-compose.yml`
-- [ ] Vercel 部署（Root Directory 要设成 `apps/web`）
+- [x] `apps/api/Dockerfile` —— 多阶段构建，tini 作 PID 1、非 root（UID 10001）、
+      `HEALTHCHECK` 用 python 探活（省掉装 curl）、`/data` 卷、`ALLOW_DEV_CORS=0`
+- [x] `docker-compose.yml` —— 端口只绑 `127.0.0.1:8000`（后端无鉴权，不该裸暴露）、
+      `restart: unless-stopped`、`stop_grace_period: 30s`、日志轮转 10m×3
+- [x] `.dockerignore` —— 密钥 / 依赖 / 构建产物 / `data/` / 文档一律不进镜像
+- [x] 路径逻辑已在**模拟的容器目录结构**下验证：
+      `/app/apps/api/src/core/paths.py` → `parents[4]` = `/app`，不越界
+
+> ⚠️ **镜像尚未实际构建过** —— 开发机上没有 Docker。
+> 首次构建若失败，优先查 `requirements.txt` 在 `python:3.11-slim` 上的兼容性。
+>
+> ⚠️ **目录层级不能改**：`paths.py` 靠 `parents[4]` 推仓库根，
+> 把 `apps/api/src/` 打平会让所有路径解析**静默失败**。Dockerfile 里有注释标了这一点。
+
+**还没做：**
+
+- [ ] Vercel 部署（Root Directory 要设成 `apps/web`，环境变量加 `API_ORIGIN`）
 - [ ] GitHub Releases 打包桌面版
+- [ ] 后端鉴权（目前无鉴权，所以端口只绑回环）
 
 ---
 
