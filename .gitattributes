@@ -1,0 +1,24 @@
+# 统一换行符 —— 避免 Windows 贡献者造成整文件 diff
+* text=auto eol=lf
+
+# 显式声明为二进制，禁止任何换行符转换
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.svg   text eol=lf
+*.woff  binary
+*.woff2 binary
+
+# 锁文件在 diff 里噪音极大，折叠掉
+package-lock.json  linguist-generated=true -diff
+pnpm-lock.yaml     linguist-generated=true -diff
+
+# 文档不计入语言统计，否则 Markdown 会盖过真实代码占比
+docs/**            linguist-documentation
+*.md               linguist-documentation
+
+# 表情包是脚本生成的产物，不计入统计
+apps/web/public/stickers/**  linguist-generated=true
