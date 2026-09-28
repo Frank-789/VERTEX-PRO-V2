@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .api.chat import router as chat_router
+from .core import event_log
 from .core.paths import data_home, ensure_dirs, prompts_dir, repo_root
 from .core.provider_router import get_router
 from .core.tool_center import get_tool_center
@@ -57,6 +58,11 @@ async def lifespan(_app: FastAPI):
 
     log.info("数据目录：%s", data_home())
     log.info("提示词目录：%s", prompts_dir())
+
+    # 事件日志按天落盘，启动时清一次过期的。放这里而不是定时任务 ——
+    # 这个项目的部署形态是「跑起来就不停」，启动时清一次足够了。
+    removed = event_log.prune()
+    log.info("事件日志：%s（清理了 %d 个过期文件）", data_home() / "event-log", removed)
     yield
 
 

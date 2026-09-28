@@ -25,7 +25,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from ..core import session
+from ..core import event_log, session
 from ..core.agent import ErrorEvent, TextChunk, ToolEvent, run_turn
 from ..core.paths import ensure_dirs
 from ..core.tool_center import get_tool_center
@@ -63,8 +63,12 @@ async def _event_stream(req: ChatRequest) -> AsyncIterator[str]:
     session.append(session_id, "user", req.message)
 
     answer: list[str] = []
+    turn = event_log.Turn(session_id=session_id, user_message=req.message)
+    ok = True
     try:
-        async for ev in run_turn(req.message, history=history, platform=req.platform):
+        async for ev in run_turn(
+            req.message, history=history, platform=req.platform, turn=turn
+        ):
             if isinstance(ev, TextChunk):
                 answer.append(ev.text)
                 yield _sse("chunk", {"text": ev.text})
@@ -76,11 +80,14 @@ async def _event_stream(req: ChatRequest) -> AsyncIterator[str]:
             elif isinstance(ev, ErrorEvent):
                 yield _sse("error", {"message": ev.message})
     except Exception as exc:  # noqa: BLE001 —— 流已经开始，只能把错误发下去
+        ok = False
         log.exception("对话出错")
+        turn.error(f"服务异常：{exc}")
         yield _sse("error", {"message": f"服务异常：{exc}"})
     finally:
         if answer:
             session.append(session_id, "assistant", "".join(answer))
+        turn.finish(chars=sum(len(a) for a in answer), ok=ok)
         yield _sse("done", {"sessionId": session_id})
 
 

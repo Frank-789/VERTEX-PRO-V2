@@ -142,6 +142,91 @@ except ValueError:
 session.append(SID, "user", "这句没有回答")
 check("尾部悬空 user 已剔除", session.history(SID)[-1]["role"] == "assistant")
 
+# ── 5. 事件日志 ──────────────────────────────────────────────
+import os  # noqa: E402
+import tempfile  # noqa: E402
+import time  # noqa: E402
+
+from src.core import event_log  # noqa: E402
+from src.core.paths import data_home  # noqa: E402
+
+day = time.strftime("%Y-%m-%d", time.localtime())
+logfile = data_home() / "event-log" / f"{day}.jsonl"
+
+check("事件日志已按天生成", logfile.exists(), logfile.name)
+
+recs = []
+if logfile.exists():
+    for line in logfile.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            recs.append(json.loads(line))
+
+# 只挑刚才这轮（一个会话里可能还有别人跑过的记录）
+mine = [r for r in recs if r.get("session") == SID]
+kinds = [r["type"] for r in mine]
+check("记录了 turn.start / tool.call / turn.end", kinds == ["turn.start", "tool.call", "turn.end"], kinds)
+
+turns = {r.get("turn") for r in mine}
+check("三笔记录同属一轮（turn id 一致）", len(turns) == 1, turns)
+
+tc = next((r for r in mine if r["type"] == "tool.call"), {})
+check("工具记录带完整结果", "单件净利" in tc.get("result", ""), tc.get("resultChars"))
+check("工具记录带耗时与状态", tc.get("ms") is not None and tc.get("status") == "ok")
+check("工具记录没有截断", tc.get("truncated") is False, tc.get("truncated"))
+
+te = next((r for r in mine if r["type"] == "turn.end"), {})
+check("turn.end 标记成功", te.get("ok") is True)
+check("turn.end 汇总了步数与字数", te.get("steps") == 1 and te.get("chars", 0) > 0, te.get("steps"))
+
+# 日志不该反过来污染会话历史
+check(
+    "工具原始输出没进会话文件",
+    all("单件净利" not in h["content"] for h in session.history(SID)),
+)
+
+# ── 6. 截断与清理（隔离在临时目录里跑）──────────────────────
+old_home = os.environ.get("DATA_HOME")
+with tempfile.TemporaryDirectory() as tmp:
+    os.environ["DATA_HOME"] = tmp
+    try:
+        big = "x" * (event_log.MAX_RESULT + 1000)
+        t = event_log.Turn(session_id="tmp", user_message="hi")
+        t.tool(name="profit.calc", status="ok", ms=1, result=big)
+        t.finish(chars=1)
+
+        tmpdir = Path(tmp) / "event-log"
+        tmp_recs = [
+            json.loads(line)
+            for line in (tmpdir / f"{day}.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        big_rec = next(r for r in tmp_recs if r["type"] == "tool.call")
+        check("超长结果被截断并打标", big_rec["truncated"] is True, big_rec["resultChars"])
+        check("截断后长度等于上限", len(big_rec["result"]) == event_log.MAX_RESULT)
+
+        # 造一个「31 天前」的文件，看清理会不会带走它
+        stale = tmpdir / "2000-01-01.jsonl"
+        stale.write_text("{}\n", encoding="utf-8")
+        os.utime(stale, (time.time() - 31 * 86400, time.time() - 31 * 86400))
+        removed = event_log.prune(days=30)
+        check("清理删掉过期文件", removed == 1 and not stale.exists(), removed)
+        check("清理没误删当天的", (tmpdir / f"{day}.jsonl").exists())
+
+        # 关掉开关就一条都不写
+        os.environ["EVENT_LOG"] = "0"
+        before = (tmpdir / f"{day}.jsonl").read_text(encoding="utf-8")
+        event_log.write({"type": "should.not.appear"})
+        check(
+            "EVENT_LOG=0 时完全静默",
+            (tmpdir / f"{day}.jsonl").read_text(encoding="utf-8") == before,
+        )
+    finally:
+        os.environ.pop("EVENT_LOG", None)
+        if old_home is None:
+            os.environ.pop("DATA_HOME", None)
+        else:
+            os.environ["DATA_HOME"] = old_home
+
 print()
 print(f"{'全部通过' if not FAIL else '失败：' + ', '.join(FAIL)}")
 sys.exit(1 if FAIL else 0)

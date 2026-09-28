@@ -18,6 +18,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
+from . import event_log
 from .prompts import get_prompt
 from .provider_router import ProviderUnavailable, get_router
 from .tool_center import get_tool_center
@@ -101,8 +102,13 @@ async def run_turn(
     user_message: str,
     history: list[dict[str, Any]] | None = None,
     platform: str | None = None,
+    turn: event_log.Turn | None = None,
 ) -> AsyncIterator[Event]:
-    """跑一轮对话，产出事件流。"""
+    """跑一轮对话，产出事件流。
+
+    `turn` 是可选的事件日志记录器。传 None 就完全不落盘 ——
+    测试和一次性脚本不必为此建目录。
+    """
     router = get_router()
     center = get_tool_center()
     messages = _build_messages(user_message, history, platform)
@@ -116,6 +122,8 @@ async def run_turn(
         try:
             msg = await router.complete_message(messages, tools=tools)
         except ProviderUnavailable as exc:
+            if turn:
+                turn.error(str(exc))
             yield ErrorEvent(str(exc))
             return
 
@@ -123,6 +131,8 @@ async def run_turn(
         if not calls:
             break
 
+        if turn:
+            turn.step()
         messages.append(msg)
 
         for call in calls:
@@ -151,16 +161,29 @@ async def run_turn(
                     result, ensure_ascii=False, default=str
                 )
                 elapsed = int((time.monotonic() - started) * 1000)
+                count = _count_items(payload)
+                if turn:
+                    # 这里落**完整**输出；给前端的 detail 截到 4000 是为了别把
+                    # SSE 撑爆，但日志存在的意义恰恰是留下原始返回
+                    turn.tool(
+                        name=tool_name, status="ok", ms=elapsed,
+                        args=args, result=payload, count=count,
+                    )
                 yield ToolEvent(
                     id=call_id, name=tool_name, label=label, status="ok",
                     source=spec.source if spec else None,
-                    count=_count_items(payload),
+                    count=count,
                     duration_ms=elapsed,
                     detail=payload[:4000],
                 )
             except Exception as exc:  # noqa: BLE001
                 elapsed = int((time.monotonic() - started) * 1000)
                 payload = f"工具调用失败：{exc}"
+                if turn:
+                    turn.tool(
+                        name=tool_name, status="failed", ms=elapsed,
+                        args=args, error=str(exc),
+                    )
                 yield ToolEvent(
                     id=call_id, name=tool_name, label=label, status="failed",
                     duration_ms=elapsed, error=str(exc),
