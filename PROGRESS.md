@@ -4,14 +4,16 @@
 > 任何人（或任何 AI）接手时，先读这里，再读 `docs/01-架构重构方案.md`。
 > 规则：每完成一件事就更新这里，别攒着写。
 
-**最后更新**：2026-09-28
-**当前阶段**：事件日志（Phase 2 第一项）**已完成**。本地领先远端 **5 个提交，一个都没推**。
+**最后更新**：2026-09-28（下午）
+**当前阶段**：**全部推上去了 ✅** 远端 `main` = `36ac7ad`。
+**CI 首次运行三个 job 全绿** ✅（后端冒烟测试 / 前端构建 / 密钥扫描）。
+事件日志（Phase 2 第一项）**已完成**。
 
-> ⚠️ **堵点不是 `workflow` 作用域** —— 那个判断是错的。
-> 唯一活着的 token 权限是**只读**，连内容都写不上去，**根本轮不到检查 workflow**。
-> 真相和验证过程见第七节。
+> **推送堵点已彻底解决**（见第七节）。用户新做了一个 **classic token**
+> （勾了 `repo` + `workflow`），实测 scopes 齐全、写探针 **201**，一次推成功。
+> **之前「缺 workflow 作用域」的判断是错的** —— 真根因是旧 token 只读。
 
-下一步：按第七节**重建一个可写的 token** 推上去，然后 Vercel 部署前端。
+下一步：Vercel 部署前端 → Phase 3 的 `data/issues/<id>.md` 自调度。
 
 ---
 
@@ -365,6 +367,8 @@ cd apps/api && .venv/bin/python tests/test_smoke.py    # 不需 key
 | fine-grained token「勾了权限还是不行」 | 建 token 时 `Repository access` 选了 **`Public Repositories (read-only)`** —— 这个选项会把整个权限面板**锁死成只读、灰掉勾不动**。表现：读公开仓库正常（200），一写就 403。而且**这个页面上根本没有 `workflow` 勾选框**，那是经典 token 才有的 | 重建时选 **`Only select repositories`** 并勾上目标仓库，权限面板才解锁。要推 workflow 文件需**同时**给 `Contents: Read and write` 和 `Workflows: Read and write` |
 | 翻遍桌面找不到可用 token | `Github终端更新指令.txt` 里其实有 **3 个不同 token**，而 `grep 'ghp_'` 只捞到**已经失效的那两个经典 token**，恰好漏掉唯一活着的 fine-grained 那个 | 找凭证要**匹配两种前缀**：`ghp_`（经典）+ `github_pat_`（fine-grained）；而且必须**逐个实测**，文件里有 token ≠ token 能用 |
 | 死盯一个旧报错反复诊断 | `workflow scope` 那条报错是 9-27 的状态。之后 token 换过，**报错早就不是那个了**（变成了 401 / 403） | 重新动手前**先重新实测一遍当前状态**，别拿几天前的报错当现状 |
+| 数错了「领先几个提交」 | 本地的 `origin/main` 引用是**旧的**（停在 `6e8a364`），实际远端早到了 `b46f480`。`git rev-list origin/main..HEAD` 数出来 5 个，真实只差 4 个 | **下结论前先 `git fetch`**。本地的 `origin/*` 只是个缓存，不代表远端现状 |
+| 以为「token 能登录」=「token 能用」 | 登录只走读接口。GitHub 的权限是**读写分开**判的，读 200 完全不代表写能过 | 建完 token **先打一发写探针**（`POST /git/blobs`）再推。这次就是靠它确认 201 才敢推 |
 
 ---
 
@@ -434,19 +438,35 @@ curl https://api.github.com/  → 200（0.5 秒）
 3. `api.github.com` 匿名限流只有 60 次/小时，批量拉数据时容易撞到，
    带上 token 可提到 5000。
 
-### 当前进度：本地领先 5 个提交（2026-09-28 复查）
+### ✅ 已解决：全部推送成功（2026-09-28）
 
-远端 `main` 停在 `6e8a364`。本地多出 5 个，**一个都没推上去**：
+```
+b46f480..36ac7ad  main -> main
+```
 
-| 提交 | 内容 |
-|---|---|
-| `e870e94` | 后端容器化（Dockerfile / compose / dockerignore） |
-| `b46f480` | PROGRESS 整理（纯文档） |
-| `aa3f7e2` | CI 工作流（`.github/workflows/ci.yml`） |
-| `6801124` | 色板切换器 + 首页重排 |
-| `6da4693` | 事件日志落盘（Phase 2 第一项） |
+远端 `main` 现在指向 `36ac7ad`，`.github/workflows/ci.yml` 在远端返回 200。
+**CI 第 1 次运行三个 job 全部 success**（`actions/runs/36370067493`）：
 
-推之前扫过这 5 个提交的增量：`ghp_` / `github_pat_` / `sk-` / `apify_api_` /
+```
+后端 · 冒烟测试    completed  success      ← 35 项，无需任何 API key
+密钥扫描          completed  success      ← 密钥扫描 job 从此自动跑
+前端 · 构建        completed  success
+```
+
+**注意实际只推了 4 个提交** —— 本地 `origin/main` 引用是**旧的**（停在 `6e8a364`），
+`e870e94` 和 `b46f480` 其实早就在远端了。**别信本地的 `origin/*` 引用**，
+下结论前先 `git fetch`。
+
+| 提交 | 内容 | 推没推 |
+|---|---|---|
+| `e870e94` | 后端容器化（Dockerfile / compose / dockerignore） | 早就在远端 |
+| `b46f480` | PROGRESS 整理（纯文档） | 早就在远端 |
+| `aa3f7e2` | CI 工作流（`.github/workflows/ci.yml`） | ✅ 本次 |
+| `6801124` | 色板切换器 + 首页重排 | ✅ 本次 |
+| `6da4693` | 事件日志落盘（Phase 2 第一项） | ✅ 本次 |
+| `36ac7ad` | PROGRESS 纠错 | ✅ 本次 |
+
+推之前扫过这批提交的增量：`ghp_` / `github_pat_` / `sk-` / `apify_api_` /
 私钥 / `api_key=` 赋值 —— **全空，没有密钥字面量**。扫完再推，别省这一步。
 
 ### 真正的堵点：不是 workflow，是「只读」（2026-09-28 实测）
@@ -479,21 +499,30 @@ x-accepted-github-permissions: contents=write
 `Repository access` 如果选了 **`Public Repositories (read-only)`**，
 整个权限面板会被**锁死成只读、灰掉勾不动**。现象完全对得上。
 
-### 下一步：重建 token（二选一）
+### 最后是怎么解决的
 
-**A. 经典 token（推荐 —— 两个勾选框，30 秒）**
+**A. 经典 token —— ✅ 走的就是这条，一次成功**
 
 https://github.com/settings/tokens → `Generate new token (classic)` →
 勾上 **`repo`** + **`workflow`** → 生成。
 
-**B. fine-grained token（要选对仓库访问方式，否则权限锁死）**
+新 token 的实测结果（**光看「能登录」不够，要看到写探针返回 201**）：
+
+```
+GET  /user      → HTTP/2 200
+x-oauth-scopes: admin:enterprise, ..., repo, ..., workflow, ...
+
+POST /git/blobs → HTTP/2 201 Created     ← 这行才是关键
+```
+
+**B. fine-grained token（要选对仓库访问方式，否则权限锁死）—— 未走通，留作参考**
 
 https://github.com/settings/tokens?type=beta → `Generate new token` →
 `Repository access` 选 **`Only select repositories`** → 勾 `VERTEX-PRO-V2` →
 `Repository permissions` 里把 **`Contents`** 和 **`Workflows`**
 **两项都**设成 `Read and write` → 生成。
 
-### 拿到新 token 后，直接跑这段
+### 换 token 时的验证流程（留档，下次还用这套）
 
 **别把 token 写进命令行** —— 那会留在 shell 历史里。用 `read -s` 读，
 不回显也不进历史（zsh）：
@@ -516,24 +545,48 @@ git -C ~/Desktop/Vertex/VERTEX-PRO-V2 push \
 > ⚠️ ① 那行如果打印的不是 `HTTP/2 200`，或者经典 token 的 scopes 里没有
 > `workflow` —— **先别推**，说明 token 还是不对，推了只会再浪费一轮。
 
-### ⚠️ 桌面那两个文件该清了
+### ⚠️ 桌面那两个文件该清了（现在比之前更紧急）
 
-`Github终端更新指令.txt` 里塞了 **3 个**token、`部署流程.txt` 里 2 个，
-**没有一个可用**（唯一活着的那个是只读）。全部明文躺在桌面，
-而且都已经在对话里出现过。建议：
+`Github终端更新指令.txt` 里现在有 **3 个** token：新加的 `ghp_tMzX…`
+（**能用，而且权限极大**）+ 两个已失效的旧版；`部署流程.txt` 里 2 个（已失效）。
 
-1. 从这两个文件里**删掉所有 token**
-2. 新 token 用 keychain 存，输一次以后自动记住：
+**风险点**：这个能用的 token，实测 scopes 是
+
+```
+admin:enterprise, admin:org, admin:repo_hook, delete_repo, repo,
+workflow, write:packages, copilot, gist, notifications, …
+```
+
+——**几乎等于账号全权限，没有过期时间，明文躺在桌面**。
+这台机器被人碰到、或桌面被同步进 iCloud/备份，等于把整个 GitHub 账号交出去。
+
+建议：
+
+1. 从这两个文件里**删掉所有 token**（失效的也删，免得下次又逐个试一遍浪费一轮）
+2. 用 keychain 存，输一次以后自动记住：
 
 ```bash
 git config --global credential.helper osxkeychain
 ```
 
+3. 如果一定要留在文件里，**把 scope 收窄**：这个项目只用到
+   `repo` + `workflow`，没必要开 `admin:org` / `delete_repo` / `write:packages`。
+
 ### 教训
 
-**别拿几天前的报错当现状。** 这条堵点我兜了两圈，根因就是：
+**① 别拿几天前的报错当现状。** 这条堵点兜了两圈，根因就是：
 9-27 写下的 `workflow scope` 结论被当成事实沿用，而中间 token 早换过了，
 报错也从「缺 workflow」变成了「401」再变成「403 只读」。
 **重新动手前，先把当前状态重测一遍。**
+
+**② 判断「能不能推」，要测写、不测读。** 整个过程中最有效的一步是
+`POST /git/blobs` 那一发写探针 —— 它一次把「token 还活着吗 / 能写吗 /
+缺哪个权限」三个问题全答了，响应头 `x-accepted-github-permissions`
+还会直接点名缺哪个。**以后换 token 都先打这一发，别等推完 4 个提交才发现。**
+
+**③ 也别忘了承认前一个判断是错的。** 这份文档 9-27 那版白纸黑字写着
+「唯一能推的是 `ghp_42FT…`，解法是勾 `workflow`」——用户照着做了，
+但那个 token 当天晚些就失效了，照做当然没用。**文档里的「结论」要标日期，
+不能当成永久事实。**
 
 
