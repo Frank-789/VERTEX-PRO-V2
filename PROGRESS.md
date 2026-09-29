@@ -4,19 +4,24 @@
 > 任何人（或任何 AI）接手时，先读这里，再读 `docs/01-架构重构方案.md`。
 > 规则：每完成一件事就更新这里，别攒着写。
 
-**最后更新**：2026-09-28（晚）
-**当前阶段**：**Phase 3 的定时任务已做完（未提交）**。事件日志、CI、容器化早已推上去，
-远端 `main` = `432a803`，CI 三个 job 全绿。
+**最后更新**：2026-09-29
+**当前阶段**：**Phase 3 的定时任务已推上去 ✅** 远端 `main` = `0920e79`，
+CI 三个 job 全绿（`actions/runs/36538512914`），含新增的「定时任务逻辑测试」step。
 
-**本轮新增 —— Phase 3 第一项：`data/issues/<id>.md` 自调度** ✅ 纯后端、不依赖任何账号，
+**本轮完成 —— Phase 3 第一项：`data/issues/<id>.md` 自调度** ✅ 纯后端、不依赖任何账号，
 已**真机跑通**（详见第二节「定时任务」小节）。测试从 35 项涨到 **140 项**
-（冒烟 59 + 定时任务 81），CI 已接上第二个套件。
+（冒烟 59 + 定时任务 81）。文档、示例、配置参考一并补齐。
 
-**尚未提交**：本轮 6 个新文件 + 5 个改动还躺在工作区，见第六节末尾的提交清单。
+> 🔑 **推送那个「玄学」找到了真凶：不是 github.com 抽风，是沙箱。**
+> 同一个环境里 `curl https://github.com/` 通（200，0.9 秒），
+> 但 `git push` 死活 `Failed to connect to github.com port 443`（卡满 75 秒）。
+> **curl 的流量被放行，git 的出站被拦** —— 所以一直看着像「网站间歇性抽风」。
+> 关掉沙箱再推，**一次就过**。踩了整整两轮的坑，见第五节新增的两行。
 
-下一步：① 提交并推送本轮（清单见第六节末尾）→ ② 写 `docs/04-定时任务.md`
-+ 补 `.env.example` 那四个开关 → ③ **Vercel 部署前端**（要做什么见第三节 Phase 4）
-→ ④ 前端入件箱展示。
+下一步：① Vercel 部署前端（逐步清单在 `docs/02-部署指南.md` 第三节，
+两条关键：Root Directory 设 `apps/web`、环境变量 `API_ORIGIN`）
+→ ② 前端入件箱展示（后端 + API 已就绪）
+→ ③ `apps/api/Dockerfile` + `docker-entrypoint.sh` 那两份改动还没提交，见下。
 
 > **推送堵点已彻底解决**（见第七节）。用户新做了一个 **classic token**
 > （勾了 `repo` + `workflow`），实测 scopes 齐全、写探针 **201**，一次推成功。
@@ -512,6 +517,8 @@ ls data/inbox/                                        # 报告就在这儿
 | 带 `../` 的任务 id 能跑到目录外 | 只在**读**入口卡了 id 白名单，`inbox.write` 那条**写**入口没卡 —— 一个 `../evil` 在写入时就已经把文件放到 `data/inbox/` 外面去了 | 读入口和写入口**都要校验**。同一条 id 经过几条路径，就有几处要卡（已补测试：`"x"*100` 和 `"../evil"`） |
 | `PyYAML` / `tzdata` 一直是「能用」的 | 那是蹭 `uvicorn[standard]` 的**传递依赖** —— 巧合，不是契约。上游哪天换个依赖树就炸。`python:3.11-slim` 里也**不保证**有 `/usr/share/zoneinfo`，缺了直接 `ZoneInfoNotFoundError` | 直接 import 的包就写进 `requirements.txt`，并注明**为什么**需要它。**「能跑」不等于「声明过」** |
 | 改测试文件时把别的测试弄挂了 | 我把新增的 `count=False` 测试块**插在了状态往返断言前面**，`lastStatus` 被改成 `"running"`，导致「状态存取往返一致」失败 | 新测试块要有自己的独立状态对象，别复用别人正在断言的那个 |
+| **`git push` 卡满 75 秒报连不上 github.com** | **是沙箱，不是网络。** 同一个环境里 `curl https://github.com/` 秒回 200（0.9 秒、DNS 正常、无代理），但 git 的出站被沙箱拦着 —— **curl 放行、git 不放**，所以现象看起来就是「github.com 间歇性抽风」 | **别去重试，直接去掉沙箱跑**。2026-09-29 实测：关掉沙箱一次就过。这一条推翻了第七节原来的判断 |
+| 拿 curl 的结果推断 git 能不能用 | 两者走的出站通道在沙箱里**待遇不同**。`curl 200` 完全不能说明 `git push` 能过 —— 这次就是这么被误导的 | 判断 git 的网络能力，**要么直接推一次**，要么用同样的通道测。别拿另一个工具的连通性当证据 |
 
 ---
 
@@ -533,30 +540,32 @@ ls data/inbox/                                        # 报告就在这儿
    效果一样但不在任何地方落盘。用户接受这类改进，**说明理由即可**。
 8. **截图要真跑真截**，不要拿效果图充数。这轮的 5 张图是起了
    mock_provider + FastAPI + Next.js 完整链路、让 Agent 真跑完一轮工具调用后截的。
+9. **`git push` 要关掉沙箱跑**（2026-09-29 确认）。在这个环境里沙箱放行
+   `curl`、拦截 `git` 的出站，所以会看到「curl 通、git 卡 75 秒」这种
+   自相矛盾的现象。**别重试、别改配置、别怀疑网络 —— 直接去掉沙箱。**
+   第七节原来那条「github.com 间歇性抽风」的判断已被这条推翻。
 
-### 本轮待提交的清单（写这份文档时还没提交）
+### 本轮已提交的内容（4 个提交，已推）
 
-工作区里躺着的（`git status` 核对过）：
+| 提交 | 内容 |
+|---|---|
+| `08aec91` | `feat(api)` —— 定时任务：6 个新文件（cron / issues / inbox / runner / scheduler / 路由）+ `main.py` 接线 + `requirements.txt` |
+| `0db5264` | `test(api)` —— 81 项逻辑测试 + 冒烟测试第 7 节端到端 + CI 加第二个 step |
+| `e1041c4` | `docs` —— `docs/04-定时任务.md`、`docs/03` 补两处、`examples/issues/`、`.env.example`、README |
+| `0920e79` | `docs` —— CHANGELOG + PROGRESS |
 
-| 状态 | 文件 | 内容 |
+提交前扫过增量：`ghp_` / `github_pat_` / `sk-` / `apify_api_` / 私钥 /
+`api_key=` 赋值 —— 全空。
+
+### ⚠️ 还躺在工作区、**别的会话留下的**两个文件（本轮没碰）
+
+| 状态 | 文件 | 它是干什么的 |
 |---|---|---|
-| 新增 | `apps/api/src/core/cron.py` | cron 解析（纯函数） |
-| 新增 | `apps/api/src/core/issues.py` | 任务解析 / 扫描 / 状态 / 判到点 |
-| 新增 | `apps/api/src/core/inbox.py` | 报告投递 |
-| 新增 | `apps/api/src/core/runner.py` | 无头执行 |
-| 新增 | `apps/api/src/core/scheduler.py` | 后台调度循环 |
-| 新增 | `apps/api/src/api/issues.py` | 四个 API 路由 |
-| 新增 | `apps/api/tests/test_issues.py` | 81 项纯逻辑测试 |
-| 改动 | `apps/api/src/main.py` | 挂路由 + 启动/停止调度器 + `/health` 两块 |
-| 改动 | `apps/api/requirements.txt` | 补 `PyYAML` / `tzdata`（原本是蹭传递依赖） |
-| 改动 | `apps/api/tests/test_smoke.py` | 加第 7 节端到端；顶部设 `ISSUE_SCHEDULER=0` |
-| 改动 | `.github/workflows/ci.yml` | job 改名 + 加第二个测试 step |
+| 改动 | `apps/api/Dockerfile` | 加了 `PORT` 环境变量支持（Render 会注入），HEALTHCHECK 跟着走，`CMD` 改成调启动脚本 |
+| 未跟踪 | `apps/api/docker-entrypoint.sh` | 容器里同时起 mock 供应商 + uvicorn，让 demo 零成本可跑。**开关就是 `MOCK_API_KEY`** —— 和 `provider_router.py` 判断 mock 可用性的条件保持一致，否则会「路由以为能用的供应商其实没起」 |
 
-**另外两个文件是别的会话留下的，本轮没碰**，要不要提交请先看一眼：
-`apps/api/Dockerfile`（已改动）、`apps/api/docker-entrypoint.sh`（未跟踪）。
-提交前记得先扫一遍密钥（`.env` 永远不进仓库）。
-
-建议拆成三个提交：`core/` 逻辑 → `api/` + `main.py` 接线 → 测试 + CI。
+看着是完整、自洽的一批（Render 部署 + 零成本 demo），**但不是我写的，我没验过**。
+要提交的话建议单独一个 `feat(deploy)` 提交。
 
 ---
 
@@ -583,6 +592,16 @@ curl https://api.github.com/  → 200（0.5 秒）
 注意这是**间歇性**的：会话早期通、后来断、2026-09-27 又通了。
 不是配置问题，是环境级的网络抖动。**`api.github.com` 和 `raw.githubusercontent.com`
 始终可用**，所以当年才用 Git Data API 绕行。
+
+> 🔴 **2026-09-29 更正：上面这条判断是错的（至少不完整）。**
+> 同一天实测：`curl https://github.com/` **秒回 200**（0.9 秒），
+> 而 `git push` 依然卡满 75 秒报 `Failed to connect to github.com port 443`。
+> 关掉沙箱再推，**一次就过**。
+>
+> 也就是说 **curl 和 git 在这个环境里的出站待遇不一样** ——
+> 沙箱放行 curl、拦截 git。当年看到的「间歇性」很可能是同一回事的两种表现，
+> 而不是 GitHub 真的在抽风。
+> **下次遇到「推不上去」，先怀疑沙箱，别先怀疑网络。**
 
 **② 本机没有任何可用凭证**
 
