@@ -172,6 +172,7 @@ curl localhost:8000/health
 | [01-架构重构方案](docs/01-架构重构方案.md) | 对标分析、现状体检、迁移映射、分阶段计划、许可证红线 |
 | [02-部署指南](docs/02-部署指南.md) | 本地开发、Docker、Vercel、环境变量 |
 | [03-配置参考](docs/03-配置参考.md) | `config/*.json` 字段说明、提示词覆盖机制 |
+| [04-定时任务](docs/04-定时任务.md) | `data/issues/` 文件自调度、cron 语义、报告投递 |
 | [PROGRESS.md](PROGRESS.md) | 进度日志 —— 换一个对话窗口也不会失忆 |
 
 ## 开发
