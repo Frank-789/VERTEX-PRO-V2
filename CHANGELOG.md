@@ -9,13 +9,41 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **定时任务：`data/issues/` 文件自调度** —— 一个 Markdown 文件就是一个任务，
+  带上 `when:` 就按 cron 自己跑，跑完把报告投到 `data/inbox/`。
+  没有任务管理界面，也没有独立的调度服务。详见 **[docs/04-定时任务.md](docs/04-定时任务.md)**
+  - 4 个新端点：`GET /issues`、`POST /issues/{id}/run`、`GET /inbox`、`GET /inbox/{name}`
+  - 三个设计取舍：**判据是「上次跑之后有没有命中过」**（而非「此刻是否命中」，
+    因此天然抗重启）、**欠多班只补最早那一班**（`lagSeconds` 因而留得住「停机三天」）、
+    **状态先于执行落盘**（崩溃漏一班，但不会死循环）
+  - 任务状态旁挂 `data/issues/.state.json`，`.md` 保持纯声明、归用户所有
+  - 4 个开关：`ISSUE_SCHEDULER` / `ISSUE_TICK_SECONDS` / `ISSUE_MAX_PER_TICK` / `ISSUE_DEFAULT_TZ`
+  - `examples/issues/` —— 4 个可直接复制的示例（含一个「没有 `when:`」的看板卡片）
+- **事件日志落盘 `data/event-log/`** —— 按天分文件，记录每轮的 `turn.start` /
+  `tool.call` / `turn.end`，工具**完整输出**只在这里（不进会话历史）。保留 30 天，
+  `EVENT_LOG=0` 可整体关闭
+- **色板切换器** —— 页眉里的图标按钮，四个色板 + 跟随系统，选择存 `localStorage`。
+  首帧不闪（`<head>` 内联脚本，解析期同步执行）
+- **落地页按新设计规格重排** —— 与对话页输入框同源（26px 圆角、68/168px 高度上限、
+  四层阴影），从首页走到对话页光标没有落差
+
+### 变更
+
+- `apps/api/requirements.txt` 补上 `PyYAML` 和 `tzdata` —— 之前是蹭
+  `uvicorn[standard]` 的传递依赖（巧合而非契约）；`python:3.11-slim` 里
+  也不保证有 `/usr/share/zoneinfo`
+- CI 的后端 job 从「冒烟测试」扩成两个套件（`test_smoke` + `test_issues`），
+  测试总数 35 → **140 项**
+
 ### 计划中
 
 - Phase 0 收尾：轮换第一代泄露的凭证，用 `git filter-repo` 清理旧仓库历史
-- Phase 2 持久化：事件日志落盘、领域数据进 Postgres
-- Phase 3 自动化：`issues/*.md` + `when:` frontmatter 文件自调度 → Store Pilot 真实化
-- 色板切换器 UI（机制已就绪，界面上还没有入口）
-- 落地页按新设计规格重排
+- 前端入件箱展示（后端与 API 已就绪，界面上还没有入口）
+- 领域数据进 Postgres —— **推迟**，理由见 PROGRESS.md「关于 Postgres 的判断」
+- Store Pilot 真实化（价格 / 差评 / 库存监控）—— **卡在采集凭证**
+- Vercel 部署前端、GitHub Releases 打包桌面版
 - 后端鉴权（目前所有端点无鉴权，因此仅绑回环地址）
 
 ---
