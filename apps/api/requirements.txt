@@ -3,3 +3,13 @@ uvicorn[standard]>=0.32.0
 pydantic>=2.9.0
 python-dotenv>=1.0.0
 httpx>=0.27.0
+
+# 定时任务读 data/issues/*.md 的 frontmatter。
+# 之前它一直「能用」其实是蹭 uvicorn[standard] 的传递依赖 —— 那是巧合不是契约，
+# uvicorn 哪天换了 YAML 实现我们就静默坏掉。显式写在这里。
+PyYAML>=6.0
+
+# 时区数据。zoneinfo 在 Linux 上会用系统 /usr/share/zoneinfo，但
+# python:3.11-slim 精简镜像里**不保证有**；缺了会直接抛 ZoneInfoNotFoundError，
+# 所有带 timezone 的定时任务全废。装这个包让 zoneinfo 有兜底数据源。
+tzdata>=2024.1

@@ -19,9 +19,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .api.chat import router as chat_router
-from .core import event_log
+from .api.issues import router as issues_router
+from .core import event_log, inbox
+from .core import issues as issues_mod
 from .core.paths import data_home, ensure_dirs, prompts_dir, repo_root
 from .core.provider_router import get_router
+from .core.scheduler import get_scheduler
 from .core.tool_center import get_tool_center
 
 logging.basicConfig(
@@ -63,7 +66,30 @@ async def lifespan(_app: FastAPI):
     # 这个项目的部署形态是「跑起来就不停」，启动时清一次足够了。
     removed = event_log.prune()
     log.info("事件日志：%s（清理了 %d 个过期文件）", data_home() / "event-log", removed)
+
+    # 定时任务：扫 data/issues/*.md，带 when: 的进调度。定义有问题的**照常列出来**
+    # 并打 warning —— 静默跳过会让用户以为文件没生效，实际只是格式写错了。
+    found = issues_mod.scan()
+    broken = [
+        i.id for i in found if i.error or (i.when is not None and i.when.error is not None)
+    ]
+    log.info(
+        "定时任务 %d 个（可调度 %d 个）：%s",
+        len(found),
+        sum(1 for i in found if i.schedulable),
+        data_home() / "issues",
+    )
+    if broken:
+        log.warning("有 %d 个任务定义有问题，不会被调度：%s", len(broken), ", ".join(broken))
+
+    log.info("收件箱：%s（已有 %d 份报告）", data_home() / "inbox", inbox.count())
+
+    scheduler = get_scheduler()
+    scheduler.start()
     yield
+    # 停机时收干净。注意：跑到一半的任务会被取消，但它的 lastRun 在开跑前
+    # 就已经落盘，所以重启不会立刻重跑 —— 见 scheduler._execute 的注释。
+    await scheduler.stop()
 
 
 app = FastAPI(
@@ -83,6 +109,7 @@ if os.getenv("ALLOW_DEV_CORS", "1") == "1":
     )
 
 app.include_router(chat_router, prefix="/api/v1", tags=["chat"])
+app.include_router(issues_router, prefix="/api/v1", tags=["issues"])
 
 
 @app.get("/health")
@@ -90,6 +117,7 @@ async def health() -> JSONResponse:
     """健康检查 —— 顺带把配置缺口暴露出来，方便排障。"""
     router = get_router()
     center = get_tool_center()
+    found = issues_mod.scan()
     return JSONResponse(
         {
             "ok": True,
@@ -98,5 +126,16 @@ async def health() -> JSONResponse:
                 "ready": [t.name for t in center.ready()],
                 "pending": [t.name for t in center.all() if not t.is_ready()],
             },
+            "issues": {
+                "total": len(found),
+                "schedulable": sum(1 for i in found if i.schedulable),
+                "broken": [
+                    i.id
+                    for i in found
+                    if i.error or (i.when is not None and i.when.error is not None)
+                ],
+                "reports": inbox.count(),
+            },
+            "scheduler": get_scheduler().status(),
         }
     )
