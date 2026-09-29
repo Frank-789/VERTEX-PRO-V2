@@ -11,10 +11,15 @@
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# 关掉后台调度循环：测试要的是「可断言的一次 tick」，不是和一个后台任务抢时序。
+# 必须在 TestClient 进入 lifespan 之前设好。
+os.environ.setdefault("ISSUE_SCHEDULER", "0")
 
 from src.core import provider_router, session  # noqa: E402
 from src.core.provider_router import ProviderRouter  # noqa: E402
@@ -143,7 +148,6 @@ session.append(SID, "user", "这句没有回答")
 check("尾部悬空 user 已剔除", session.history(SID)[-1]["role"] == "assistant")
 
 # ── 5. 事件日志 ──────────────────────────────────────────────
-import os  # noqa: E402
 import tempfile  # noqa: E402
 import time  # noqa: E402
 
@@ -226,6 +230,99 @@ with tempfile.TemporaryDirectory() as tmp:
             os.environ.pop("DATA_HOME", None)
         else:
             os.environ["DATA_HOME"] = old_home
+
+# ── 7. 定时任务端到端 ────────────────────────────────────────
+# 扫到点 → 真跑一轮 agent（工具 + 流式）→ 投递报告 → 接口读回。
+from src.core import inbox, issues as issues_mod  # noqa: E402
+from src.core.scheduler import Scheduler  # noqa: E402
+
+old_home2 = os.environ.get("DATA_HOME")
+with tempfile.TemporaryDirectory() as tmp2:
+    os.environ["DATA_HOME"] = tmp2
+    try:
+        idir = Path(tmp2) / "issues"
+        idir.mkdir(parents=True, exist_ok=True)
+        task_file = idir / "daily-report.md"
+        task_file.write_text(
+            "---\n"
+            "title: 每日测算\n"
+            'when: { kind: cron, cron: "* * * * *", timezone: "Asia/Shanghai" }\n'
+            "---\n"
+            "算一下成本30卖99能赚多少\n",
+            encoding="utf-8",
+        )
+        # 把 mtime 拨到 5 分钟前 —— 模拟「任务文件躺了一会儿，已经欠了班次」
+        past = time.time() - 300
+        os.utime(task_file, (past, past))
+
+        sch = Scheduler()
+        CALLS["n"] = 0  # 让打桩的供应商从这个任务重新开始计数
+        results = asyncio.run(sch.tick_once())
+
+        check("到点的任务被跑了一次", len(results) == 1, [r.issue_id for r in results])
+        r0 = results[0] if results else None
+        check("任务执行成功", r0 is not None and r0.ok, r0.error if r0 else "没跑")
+        check("任务真的调了工具", r0 is not None and "profit.calc" in r0.tools, r0.tools if r0 else None)
+
+        reports = inbox.list_reports()
+        check("结果投递进了收件箱", len(reports) == 1, [x.get("name") for x in reports])
+        check("报告标成功", reports[0].get("ok") is True if reports else False)
+
+        content = inbox.read(reports[0]["name"]) if reports else ""
+        check("报告正文是模型输出", "净利率 61.9%" in content, content[-60:].strip())
+        check("报告记了排期与实际时刻", "scheduledAt" in content and "lagSeconds" in content)
+        check("报告带 turn id（可回查 event-log）", "turn:" in content)
+
+        # 状态落盘了，所以不会连着跑第二次 —— 这是「不重复触发」的核心保证
+        st = issues_mod.load_state()
+        check("状态记了 lastRun", st.get("daily-report") is not None, st.get("daily-report"))
+        check("状态记了 ok", (st.get("daily-report").last_status if st.get("daily-report") else None) == "ok")
+
+        CALLS["n"] = 0
+        again = asyncio.run(sch.tick_once())
+        check("刚跑完不会立刻重跑", again == [], [x.issue_id for x in again])
+
+        # ── 接口 ──
+        with TestClient(app) as client:
+            r = client.get("/api/v1/issues")
+            check("任务清单接口 200", r.status_code == 200)
+            listed = r.json().get("issues", [])
+            check("清单里能看到任务", len(listed) == 1 and listed[0]["id"] == "daily-report", listed)
+            check("清单带排期人话摘要", bool(listed[0].get("schedule")), listed[0].get("schedule"))
+            check("清单带下次运行时刻", bool(listed[0].get("nextRun")), listed[0].get("nextRun"))
+
+            r = client.get("/api/v1/inbox")
+            check("收件箱接口 200", r.status_code == 200 and r.json()["total"] == 1)
+
+            name = reports[0]["name"]
+            r = client.get(f"/api/v1/inbox/{name}")
+            check("报告全文接口 200", r.status_code == 200 and "净利率" in r.json()["content"])
+
+            r = client.get("/api/v1/inbox/evil")
+            check("非法报告名 400", r.status_code == 400, r.status_code)
+
+            r = client.post("/api/v1/issues/nope/run")
+            check("不存在的任务 404", r.status_code == 404, r.status_code)
+
+            CALLS["n"] = 0
+            r = client.post("/api/v1/issues/daily-report/run")
+            check("手动触发 200", r.status_code == 200 and r.json()["ok"] is True, r.json())
+            # 手动那次和定时那次在同一秒内，文件名会撞 —— 必须加序号而不是覆盖
+            check(
+                "手动触发的报告没覆盖定时那次",
+                r.json()["report"] != reports[0]["name"],
+                (reports[0]["name"], r.json()["report"]),
+            )
+            check("收件箱现在有两份", client.get("/api/v1/inbox").json()["total"] == 2)
+
+            h = client.get("/health").json()
+            check("健康检查带任务与调度器状态", "issues" in h and "scheduler" in h, h.get("issues"))
+            check("测试环境下调度循环是停的", h["scheduler"]["running"] is False)
+    finally:
+        if old_home2 is None:
+            os.environ.pop("DATA_HOME", None)
+        else:
+            os.environ["DATA_HOME"] = old_home2
 
 print()
 print(f"{'全部通过' if not FAIL else '失败：' + ', '.join(FAIL)}")

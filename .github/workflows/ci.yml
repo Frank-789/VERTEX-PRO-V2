@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   api:
-    name: 后端 · 冒烟测试
+    name: 后端 · 测试
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,10 +29,16 @@ jobs:
         working-directory: apps/api
         run: pip install -r requirements.txt
 
-      # 这 21 项不需要任何 API key，也不需要网络 —— 用 dev/mock_provider.py 的假供应商
-      - name: 冒烟测试
+      # 两个套件都不需要任何 API key，也不需要网络：
+      #   test_smoke  —— 整条链路，用 dev/mock_provider.py 的假供应商打桩
+      #   test_issues —— 定时任务的纯逻辑（cron 解析、判到点、状态），不碰真实 data/
+      - name: 冒烟测试（端到端链路）
         working-directory: apps/api
         run: python tests/test_smoke.py
+
+      - name: 定时任务逻辑测试
+        working-directory: apps/api
+        run: python tests/test_issues.py
 
   web:
     name: 前端 · 构建
